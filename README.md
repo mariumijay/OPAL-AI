@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # OPAL-AI 🩸
 
 OPAL-AI is a next-generation, AI-driven connecting platform designed to bridge the gap between organ/blood donors and healthcare facilities (Hospitals) needing immediate matching. 
@@ -90,3 +91,7 @@ e:/opal ai frontend
    npm run dev
    ```
 5. Navigate to `http://localhost:3000`.
+=======
+# OPAL-AI
+fyp
+>>>>>>> 3e7e57a0d877c258075f3800e51c92696d90cc86
