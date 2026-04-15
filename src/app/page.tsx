@@ -6,7 +6,6 @@ import { Features } from "@/components/landing/Features";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { PublicStats } from "@/components/landing/PublicStats";
 import { DonorTypes } from "@/components/landing/DonorTypes";
-import { MapPreview } from "@/components/landing/MapPreview";
 import { CTASection } from "@/components/landing/CTASection";
 import { RegistrationToast } from "@/components/shared/RegistrationToast";
 import { Suspense } from "react";
@@ -25,7 +24,6 @@ export default function HomePage() {
         <Features />
         <HowItWorks />
         <PublicStats />
-        <MapPreview />
         <CTASection />
       </main>
       <Footer />
