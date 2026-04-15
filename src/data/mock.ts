@@ -3,7 +3,7 @@
 // Used when Supabase tables are empty
 // ============================================================
 
-import type { Donor, Match, Hospital, CityDonorStats } from '@/lib/types';
+import type { Donor, Match, Hospital, CityDonorStats, GlobalStats } from '@/lib/types';
 
 // Keep legacy interface types for mock-only objects
 interface DonorRequest {
@@ -63,17 +63,17 @@ export const mockHospitals: Hospital[] = [
     created_at: '2024-02-20T08:00:00Z',
   },
   {
-    id: 'h-003',
-    hospital_id: 'h-003',
-    hospital_name: 'PIMS Hospital',
-    license_number: 'H-PK-PIM-003',
-    city: 'Islamabad',
-    latitude: 33.6989,
-    longitude: 73.0262,
-    contact_email: 'admin@pims.gov.pk',
-    contact_phone: '+92-51-111',
-    is_verified: true,
-    created_at: '2024-03-10T08:00:00Z',
+    id: 'h-pending-001',
+    hospital_id: 'h-pending-001',
+    hospital_name: 'Fatima Memorial Hospital (Pending)',
+    license_number: 'H-PK-FMH-992',
+    city: 'Lahore',
+    latitude: 31.5204,
+    longitude: 74.3587,
+    contact_email: 'sarah.admin@fmh.org.pk',
+    contact_phone: '+92-321-1234567',
+    is_verified: false,
+    created_at: new Date().toISOString(),
   },
 ];
 
@@ -145,6 +145,40 @@ export const mockDonors: Donor[] = [
         next_of_kin_contact: 'N/A',
         consent_signed: true
     }
+  },
+  {
+    id: 'd-pending-001',
+    user_id: 'u-003',
+    full_name: 'Zainab Qureshi',
+    first_name: 'Zainab',
+    last_name: 'Qureshi',
+    age: 22,
+    gender: 'Female',
+    contact_number: '+923051122334',
+    blood_type: 'B+',
+    is_blood_donor: true,
+    is_organ_donor: false,
+    donating_items: 'Platelets',
+    city: 'Rawalpindi',
+    latitude: 33.5651,
+    longitude: 73.0169,
+    is_available: false,
+    cnic: '37405-1234567-8',
+    created_at: new Date().toISOString(),
+    medical: {
+        hiv_status: 'Pending Test',
+        hepatitis_status: 'Pending Test',
+        is_diabetic: false,
+        is_smoker: false,
+        medical_conditions: 'None',
+        medications: 'None',
+        height_cm: 160,
+        weight_kg: 52,
+        donor_status: 'Pending Verification',
+        next_of_kin_name: 'Father',
+        next_of_kin_contact: '+92-300-0000000',
+        consent_signed: true
+    }
   }
 ];
 
@@ -160,6 +194,7 @@ export const mockMatches: Match[] = [
     status: 'pending',
     urgency: 'Emergency',
     blood_type: 'O+',
+    hospital_id: 'h-001',
     cnic: '42101-1234567-1',
     created_at: '2024-12-04T14:30:00Z',
   }
@@ -201,9 +236,9 @@ export const mockCityStats: CityDonorStats[] = [
   { city: 'Lahore', total_donors: 983, available_donors: 741, blood_donors: 815, organ_donors: 168 },
 ];
 
-export const mockGlobalStats = {
+export const mockGlobalStats: GlobalStats = {
   totalDonors: 4284,
   totalHospitals: 47,
   livesSaved: 2891,
   citiesCovered: 12,
-~};
+};

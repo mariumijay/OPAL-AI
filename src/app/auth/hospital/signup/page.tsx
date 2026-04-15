@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { HospitalRegistrationSchema } from "@/lib/schemas/hospital";
-import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 type HospitalRegistrationValues = z.infer<typeof HospitalRegistrationSchema>;
 import {
@@ -28,6 +28,19 @@ export default function HospitalSignupPage() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+
+  const checkEmailAvailability = async (email: string) => {
+    if (!email || !email.includes('@')) return;
+    setEmailStatus('checking');
+    try {
+      const res = await fetch(`/api/auth/check-email?email=${encodeURIComponent(email)}`);
+      const data = await res.json();
+      setEmailStatus(data.available ? 'available' : 'taken');
+    } catch {
+      setEmailStatus('idle');
+    }
+  };
 
   const { register, handleSubmit, trigger, formState: { errors }, watch, setValue, reset } = useForm<HospitalRegistrationValues>({
     resolver: zodResolver(HospitalRegistrationSchema) as any,
@@ -58,7 +71,14 @@ export default function HospitalSignupPage() {
     if (step === 3) fieldsToValidate = ["admin_name", "designation", "email", "password", "confirm_password"] as (keyof HospitalRegistrationValues)[];
     
     const isStepValid = await trigger(fieldsToValidate as any);
-    if (isStepValid) setStep(prev => prev + 1);
+    if (isStepValid) {
+      // Block Step 3 -> 4 if email is already taken
+      if (step === 3 && emailStatus === 'taken') {
+        toast.error("This email is already registered. Please use a different email address.");
+        return;
+      }
+      setStep(prev => prev + 1);
+    }
   };
 
 
@@ -66,60 +86,23 @@ export default function HospitalSignupPage() {
   const onSubmit = async (data: HospitalRegistrationValues) => {
     setIsSubmitting(true);
     try {
-      // 1. Create Supabase Auth User
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            first_name: data.admin_name,
-            role: 'hospital',
-            hospital_name: data.hospital_name
-          }
-        }
-      });
-
-      if (authError) throw authError;
-      const userId = authData.user?.id;
-      if (!userId) throw new Error("Authentication failed.");
-
-      // 2. Insert into Hospitals table (is_verified = false by default)
-      const { error: dbError } = await supabase.from('hospitals').insert([{
-        user_id: userId,
-        hospital_name: data.hospital_name,
-        license_number: data.license_number,
-        hospital_type: data.hospital_type,
-        city: data.city,
-        full_address: data.full_address,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        phone: data.phone,
-        emergency_contact: data.emergency_contact,
-        admin_name: data.admin_name,
-        designation: data.designation,
-        is_verified: false, // Explicitly set to false for approval flow
-        contact_email: data.email
-      }]);
-
-      if (dbError) throw dbError;
-      
-      localStorage.setItem("pending-verify-email", data.email);
-      setSubmissionSuccess(true);
-
-      // 3. Send Acknowledgment Email (Non-blocking)
-      fetch("/api/email/welcome-hospital", {
+      const response = await fetch("/api/auth/register-hospital", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: data.email,
-          hospitalName: data.hospital_name,
-          license: data.license_number
-        })
-      }).catch(e => console.error("Hospital Email Error:", e));
-      
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Registration failed");
+      }
+
+      setSubmissionSuccess(true);
+      reset();
     } catch (err: any) {
       console.error("HOSPITAL_SIGNUP_ERROR:", err);
-      alert(err.message || "An unexpected error occurred.");
+      toast.error(err.message || "An unexpected error occurred during registration.");
     } finally {
       setIsSubmitting(false);
     }
@@ -350,9 +333,31 @@ export default function HospitalSignupPage() {
                     <label className="text-sm font-semibold text-muted-foreground ml-1 font-display">Institutional Email</label>
                     <div className="relative group">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                      <input {...register("email")} type="email" placeholder="sarah.a@hospital.org.pk" className="w-full bg-card border border-border rounded-xl py-4 pl-12 pr-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all" suppressHydrationWarning />
+                      <input
+                        {...register("email")}
+                        type="email"
+                        placeholder="sarah.a@hospital.org.pk"
+                        onBlur={(e) => checkEmailAvailability(e.target.value)}
+                        className={`w-full bg-card border rounded-xl py-4 pl-12 pr-4 text-foreground focus:outline-none focus:ring-2 transition-all ${
+                          emailStatus === 'taken' ? 'border-destructive focus:ring-destructive/50' :
+                          emailStatus === 'available' ? 'border-green-500 focus:ring-green-500/50' :
+                          'border-border focus:ring-primary/50'
+                        }`}
+                        suppressHydrationWarning
+                      />
+                      {emailStatus === 'checking' && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />}
+                      {emailStatus === 'available' && <CheckCircle className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />}
+                      {emailStatus === 'taken' && <ShieldAlert className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-destructive" />}
                     </div>
-                    {errors.email && <p className="text-xs text-red-500 mt-1 ml-1 font-medium">{errors.email.message}</p>}
+                    {emailStatus === 'taken' && (
+                      <p className="text-xs text-destructive mt-1 ml-1 font-bold flex items-center gap-1">
+                        ⚠ An institutional account already exists with this email. Please use a different one.
+                      </p>
+                    )}
+                    {emailStatus === 'available' && (
+                      <p className="text-xs text-green-500 mt-1 ml-1 font-bold">✓ Email is available</p>
+                    )}
+                    {errors.email && emailStatus === 'idle' && <p className="text-xs text-red-500 mt-1 ml-1 font-medium">{errors.email.message}</p>}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

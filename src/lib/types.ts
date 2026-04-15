@@ -247,6 +247,7 @@ export interface Match {
   blood_type: string;
   organ_type?: string;
   hospital_name: string;
+  hospital_id?: string;
   cnic: string;
   created_at: string;
 }

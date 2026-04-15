@@ -18,6 +18,7 @@ export default function DonorSignupPage() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [isValidatingEmail, setIsValidatingEmail] = useState(false);
 
   const { register, handleSubmit, trigger, formState: { errors }, watch, setValue, reset } = useForm<DonorFormValues>({
     resolver: zodResolver(donorFormSchema) as any,
@@ -78,6 +79,30 @@ export default function DonorSignupPage() {
     }
     
     const isStepValid = await trigger(fieldsToValidate as any);
+    
+    // Extra validation for Step 1: Check if email exists
+    if (isStepValid && step === 1) {
+      setIsValidatingEmail(true);
+      try {
+        const email = watch("email");
+        const res = await fetch("/api/auth/check-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email })
+        });
+        const { exists } = await res.json();
+        
+        if (exists) {
+          toast.error("Account already exists with this email address. Please sign in or use another email.");
+          return;
+        }
+      } catch (err) {
+        console.error("Email check failed", err);
+      } finally {
+        setIsValidatingEmail(false);
+      }
+    }
+
     if (isStepValid) setStep(prev => prev + 1);
   };
 
@@ -107,84 +132,24 @@ export default function DonorSignupPage() {
   const onSubmit = async (data: DonorFormValues) => {
     setIsSubmitting(true);
     try {
-      // 1. Create Supabase Auth User directly (With Metadata for Dashboard Access)
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            first_name: data.firstName,
-            last_name: data.lastName,
-            role: 'donor'
-          }
-        }
+      // Use the new secure Backend API
+      const response = await fetch("/api/auth/register-donor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
       });
 
-      if (authError) throw authError;
-      const userId = authData.user?.id;
-      if (!userId) throw new Error("Could not initialize user session.");
+      const result = await response.json();
 
-      // 2. Insert into Central Donors Table
-      const fullName = `${data.firstName} ${data.lastName}`;
-      const birthDate = new Date(new Date().getFullYear() - (data.age || 20), 0, 1).toISOString().split('T')[0];
-      
-      const { error: centralErr } = await supabase.from('donors').insert([{
-        user_id: userId,
-        first_name: data.firstName,
-        last_name: data.lastName,
-        birth_date: birthDate,
-        city: data.city,
-        blood_type: data.bloodType,
-        contact_number: data.contactNumber,
-        cnic: data.cnic,
-        gender: data.gender,
-        is_blood_donor: data.donationType === "Blood Donation Only" || data.donationType === "Both",
-        is_organ_donor: data.donationType === "Organ Donation Only" || data.donationType === "Both",
-        status: 'active'
-      }]);
-
-      if (centralErr) throw new Error(`Database Error: ${centralErr.message}`);
-
-      // 3. Insert into Specialized Tables
-      if (data.donationType === "Blood Donation Only" || data.donationType === "Both") {
-        const { error: bloodErr } = await supabase.from('blood_donors').insert([{
-          user_id: userId,
-          full_name: fullName,
-          email: data.email,
-          phone: data.contactNumber,
-          age: data.age,
-          blood_type: data.bloodType,
-          hepatitis_status: data.hepStatus,
-          city: data.city,
-          is_available: true
-        }]);
-        if (bloodErr) console.warn("Blood donor entry failed but central donor created:", bloodErr.message);
-      }
-
-      if (data.donationType === "Organ Donation Only" || data.donationType === "Both") {
-        const { error: organErr } = await supabase.from('organ_donors').insert([{
-          user_id: userId,
-          full_name: fullName,
-          email: data.email,
-          phone: data.contactNumber,
-          age: data.age,
-          blood_type: data.bloodType,
-          organs_available: data.organsWilling || [],
-          hiv_status: data.hivStatus || 'Negative',
-          hepatitis_status: data.hepStatus,
-          is_living_donor: data.donorStatus === "Living",
-          next_of_kin_name: data.nextOfKinName || '—',
-          next_of_kin_contact: data.nextOfKinContact || '—',
-          consent_given: !!data.consent,
-          city: data.city,
-          is_available: true
-        }]);
-        if (organErr) console.warn("Organ donor entry failed:", organErr.message);
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to register donor");
       }
       
       localStorage.setItem("pending-verify-email", data.email);
       localStorage.removeItem("donor-draft");
       setSubmissionSuccess(true);
+      
+      const fullName = `${data.firstName} ${data.lastName}`;
       
       // 4. Send Welcome Email (Non-blocking)
       fetch("/api/email/welcome-donor", {
@@ -656,8 +621,14 @@ export default function DonorSignupPage() {
               )}
 
               {step < 4 ? (
-                <button type="button" onClick={processNextStep} className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-lg shadow-primary/20 text-sm" suppressHydrationWarning>
-                  Next Step <ArrowRight className="h-4 w-4" />
+                <button 
+                  type="button" 
+                  onClick={processNextStep} 
+                  disabled={isValidatingEmail}
+                  className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-lg shadow-primary/20 text-sm disabled:opacity-50" 
+                  suppressHydrationWarning
+                >
+                  {isValidatingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : "Next Step"} <ArrowRight className="h-4 w-4" />
                 </button>
               ) : (
                 <button 

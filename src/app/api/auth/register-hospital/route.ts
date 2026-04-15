@@ -28,38 +28,40 @@ export async function POST(request: NextRequest): Promise<NextResponse<HospitalA
     const data = result.data;
     const supabase = await createServerSupabase();
 
-    // 2. Create Supabase Auth User with metadata
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const adminSupabase = getServiceSupabase();
+    
+    // 1.5 Strict duplicate email check before signup
+    const { data: existingUser } = await adminSupabase.from('hospitals').select('id').eq('email', data.email).maybeSingle();
+    // Also check auth.users indirectly by trying to read it
+    const { data: existingUsersData } = await adminSupabase.auth.admin.listUsers();
+    const isDuplicate = existingUsersData?.users.some(u => u.email === data.email);
+
+    if (isDuplicate) {
+      return NextResponse.json({ success: false, error: "Institutional account already exists with this email" }, { status: 409 });
+    }
+
+    // 2. Create Supabase Auth User with metadata securely
+    const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
       email: data.email,
       password: data.password,
-      options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-        data: {
-          hospital_name: data.hospital_name,
-          role: 'hospital',
-          admin_name: data.admin_name,
-          designation: data.designation
-        }
+      email_confirm: true, // auto-confirm here
+      user_metadata: {
+        hospital_name: data.hospital_name,
+        role: 'hospital',
+        admin_name: data.admin_name,
+        designation: data.designation
       }
     });
 
     if (authError) {
-      if (authError.message.includes("User already registered")) {
+      if (authError.message.includes("already registered") || authError.message.includes("already exists")) {
         return NextResponse.json({ success: false, error: "Institutional account already exists with this email" }, { status: 409 });
       }
-      throw authError;
+      throw authError; // if it's something else
     }
 
     const userId = authData.user?.id;
     if (!userId) throw new Error("Authentication failed: User ID not generated");
-
-    // 2.5 Auto-confirm user email for development (Bypasses verification email)
-    const adminSupabase = getServiceSupabase();
-    const { error: updateError } = await adminSupabase.auth.admin.updateUserById(userId, { 
-      email_confirm: true 
-    });
-
-    if (updateError) throw updateError;
 
     // Small delay for DB sync
     await new Promise(resolve => setTimeout(resolve, 500));

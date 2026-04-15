@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import { motion, useInView } from "framer-motion";
 import { Heart, Building2, Users, MapPin } from "lucide-react";
 import { useGlobalStats } from "@/hooks/useSupabaseData";
-import { mockGlobalStats } from "@/data/mock";
 
 function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
   const [count, setCount] = useState(0);
@@ -40,8 +39,9 @@ function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: str
 export function LiveStats() {
   const { data: liveStats } = useGlobalStats();
 
-  // Use live data if available, fall back to mock
-  const statsData = liveStats && liveStats.totalDonors > 0 ? liveStats : mockGlobalStats;
+  // Use live data natively, showing 0 if db is empty. 
+  // We remove the fallback to mock data as requested.
+  const statsData = liveStats || { totalDonors: 0, totalHospitals: 0, livesSaved: 0, citiesCovered: 0 };
 
   const stats = [
     { icon: Users, value: statsData.totalDonors, label: "Registered Donors", suffix: "+" },

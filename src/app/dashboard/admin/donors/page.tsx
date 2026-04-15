@@ -38,6 +38,7 @@ export default function AdminDonorsPage() {
     try {
       const res = await fetch("/api/admin/toggle-donor", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ donor_id: id, type, current_status: current, reason }),
       });
       
@@ -45,15 +46,23 @@ export default function AdminDonorsPage() {
       
       if (!res.ok) throw new Error(result.error || "Toggle failed");
       
-      toast.success(current ? "Donor suspended" : "Donor re-activated");
+      // Show main success toast
+      toast.success(current ? "Donor suspended successfully" : "Donor re-activated successfully");
+
+      // Show warning if email failed
+      if (result.warning) {
+        console.warn("Email Warning:", result.warning);
+        toast.warning("Status updated but email notification failed. Check server logs.");
+      }
+
       if (type === 'blood') refetchBlood(); else refetchOrgan();
       setSuspendingDonor(null);
       setSuspensionReason("");
     } catch (e: any) {
       toast.error(e.message);
     }
-
   };
+
 
   const handleToggleClick = (id: string, type: 'blood' | 'organ', current: boolean) => {
     if (current) {

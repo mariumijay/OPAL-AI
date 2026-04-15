@@ -1,160 +1,109 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase, getServiceSupabase } from "@/lib/supabase";
-import { sendEmail } from "@/lib/mailer";
-import { geocodeCity } from "@/lib/geocode";
-import { donorFormSchema, type DonorFormValues } from "@/lib/schemas/donor";
+import { getServiceSupabase } from "@/lib/supabase";
+import { donorFormSchema } from "@/lib/schemas/donor";
+import { sendDonorWelcomeEmail } from "@/lib/mailer";
 
-
-interface ApiResponse {
-  success: boolean;
-  message?: string;
-  error?: string;
-  userId?: string;
-}
-
-export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse>> {
+export async function POST(request: NextRequest) {
   try {
-    const body: unknown = await request.json();
+    const body = await request.json();
     
-    // Validate with Zod
-    const validation = donorFormSchema.safeParse(body);
-    if (!validation.success) {
-      return NextResponse.json({ 
-        success: false, 
-        error: "Validation failed", 
-      }, { status: 400 });
+    // 1. Validation
+    const result = donorFormSchema.safeParse(body);
+    if (!result.success) {
+      return NextResponse.json({ success: false, error: "Validation failed", details: result.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    const { 
-      email, password, firstName, lastName, age, gender, city, contactNumber, 
-      bloodType, hepStatus, hivStatus, diabetes, smoker, medications, 
-      medicalConditions, height, weight, donorStatus, organsWilling, 
-      donatingItems, nextOfKinName, nextOfKinContact, consent, donationType 
-    } = validation.data;
-
-    // 1. Create User via Admin API
+    const data = result.data;
     const adminSupabase = getServiceSupabase();
-    let authData;
-    try {
-        const result = await adminSupabase.auth.admin.createUser({
-            email,
-            password,
-            email_confirm: true,
-            user_metadata: { first_name: firstName, last_name: lastName, role: 'donor' }
-        });
-        if (result.error) throw result.error;
-        authData = result.data;
-    } catch (e: any) {
-        throw new Error(`AUTH_STEP_FAILED: ${e.message}`);
+    
+    // 2. Strict Check for Duplicate Email
+    const { data: existingUsersData } = await adminSupabase.auth.admin.listUsers();
+    if (existingUsersData?.users.some(u => u.email === data.email)) {
+      return NextResponse.json({ success: false, error: "An account already exists with this email address." }, { status: 409 });
     }
- 
+
+    // 3. Create Auth User
+    const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
+      email: data.email,
+      password: data.password,
+      email_confirm: true,
+      user_metadata: {
+        first_name: data.firstName,
+        last_name: data.lastName,
+        role: 'donor'
+      }
+    });
+
+    if (authError) throw authError;
     const userId = authData.user?.id;
-    if (!userId) throw new Error("AUTH_ID_MISSING");
- 
-    // Small delay to ensure DB replication
-    await new Promise(resolve => setTimeout(resolve, 500));
+    if (!userId) throw new Error("Auth failed: No ID generated");
 
-    // Geocode city (Hardcoded to avoid external fetch for now)
-    const lat = 31.5204;
-    const lon = 74.3587;
-    const fullName = `${firstName} ${lastName}`;
+    // 4. Insert into Central Donors table
+    const birthDate = new Date(new Date().getFullYear() - (data.age || 20), 0, 1).toISOString().split('T')[0];
+    
+    const { error: dbError } = await adminSupabase.from('donors').insert([{
+      user_id: userId,
+      first_name: data.firstName,
+      last_name: data.lastName,
+      birth_date: birthDate,
+      city: data.city,
+      blood_type: data.bloodType,
+      contact_number: data.contactNumber,
+      cnic: data.cnic,
+      gender: data.gender,
+      is_blood_donor: data.donationType === "Blood Donation Only" || data.donationType === "Both",
+      is_organ_donor: data.donationType === "Organ Donation Only" || data.donationType === "Both",
+      status: 'pending'
+    }]);
 
-    // 2. Insert into Central 'donors' table
+    if (dbError) throw dbError;
+
+    // 5. Insert into specialized tables
+    if (data.donationType === "Blood Donation Only" || data.donationType === "Both") {
+       await adminSupabase.from('blood_donors').insert([{
+        user_id: userId,
+        full_name: `${data.firstName} ${data.lastName}`,
+        email: data.email,
+        phone: data.contactNumber,
+        age: data.age,
+        blood_type: data.bloodType,
+        hepatitis_status: data.hepStatus,
+        city: data.city,
+        is_available: false
+      }]);
+    }
+
+    if (data.donationType === "Organ Donation Only" || data.donationType === "Both") {
+       await adminSupabase.from('organ_donors').insert([{
+        user_id: userId,
+        full_name: `${data.firstName} ${data.lastName}`,
+        email: data.email,
+        phone: data.contactNumber,
+        age: data.age,
+        blood_type: data.bloodType,
+        organs_available: data.organsWilling || [],
+        hiv_status: data.hivStatus || "Negative",
+        hepatitis_status: data.hepStatus,
+        is_living_donor: data.donorStatus === "Living",
+        next_of_kin_name: data.nextOfKinName,
+        next_of_kin_contact: data.nextOfKinContact,
+        consent_given: !!data.consent,
+        city: data.city,
+        is_available: false
+      }]);
+    }
+
+    // 6. Send Welcome Email (Awaited for reliability)
     try {
-        const birthDate = new Date(new Date().getFullYear() - age, 0, 1).toISOString().split('T')[0];
-        const { error: centralErr } = await adminSupabase.from('donors').insert([{
-            user_id: userId,
-            first_name: firstName,
-            last_name: lastName,
-            birth_date: birthDate,
-            city: city,
-            latitude: lat,
-            longitude: lon,
-            blood_type: bloodType,
-            contact_number: contactNumber,
-            gender: gender,
-            is_blood_donor: donationType === "Blood Donation Only" || donationType === "Both",
-            is_organ_donor: donationType === "Organ Donation Only" || donationType === "Both",
-            status: 'active',
-            created_at: new Date().toISOString()
-        }]);
-        if (centralErr) throw centralErr;
-    } catch (e: any) {
-        throw new Error(`CENTRAL_DB_STEP_FAILED: ${e.message}`);
+      await sendDonorWelcomeEmail(data.email, `${data.firstName} ${data.lastName}`, data.bloodType);
+    } catch (e) {
+      console.error("Welcome Email Sending Failed:", e);
     }
 
-    // 3. Insert into separate tables
-    if (donationType === "Blood Donation Only" || donationType === "Both") {
-        try {
-            const { error: bloodErr } = await adminSupabase.from('blood_donors').insert([{
-                user_id: userId,
-                full_name: fullName,
-                email: email,
-                phone: contactNumber,
-                age: age,
-                blood_type: bloodType,
-                hepatitis_status: hepStatus,
-                medical_conditions: medicalConditions || null,
-                city: city,
-                latitude: lat,
-                longitude: lon,
-                is_available: true
-            }]);
-            if (bloodErr) throw bloodErr;
-        } catch (e: any) {
-            throw new Error(`BLOOD_DB_STEP_FAILED: ${e.message}`);
-        }
-    }
-
-    if (donationType === "Organ Donation Only" || donationType === "Both") {
-        try {
-            const { error: organErr } = await adminSupabase.from('organ_donors').insert([{
-                user_id: userId,
-                full_name: fullName,
-                email: email,
-                phone: contactNumber,
-                age: age,
-                blood_type: bloodType,
-                organs_available: organsWilling || [],
-                hiv_status: hivStatus || 'Negative',
-                hepatitis_status: hepStatus,
-                diabetes: diabetes === "Yes",
-                smoker: smoker === "Yes",
-                height_cm: height || null,
-                weight_kg: weight || null,
-                is_living_donor: donorStatus === "Living",
-                next_of_kin_name: nextOfKinName || '—',
-                next_of_kin_contact: nextOfKinContact || '—',
-                consent_given: !!consent,
-                city: city,
-                latitude: lat,
-                longitude: lon,
-                is_available: true
-            }]);
-            if (organErr) throw organErr;
-        } catch (e: any) {
-            throw new Error(`ORGAN_DB_STEP_FAILED: ${e.message}`);
-        }
-    }
-
-    /* Email Temporarily Disabled to isolate crash
-    await sendEmail({ ... });
-    */
-
-    return NextResponse.json({ 
-      success: true, 
-      message: "Registration successful. Your account is now active.", 
-      userId 
-    }, { status: 201 });
+    return NextResponse.json({ success: true, message: "Donor account created successfully." }, { status: 201 });
 
   } catch (error: any) {
-    console.error("DONOR REGISTRATION CRITICAL ERROR:", error);
-    const message = error.message || "Something went wrong";
-    
-    return NextResponse.json({ 
-      success: false, 
-      error: `SERVER_ERROR: ${message}`,
-      details: typeof error.details === 'string' ? error.details : "Internal details logged to console"
-    }, { status: 500 });
+    console.error("DONOR REGISTRATION ERROR:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

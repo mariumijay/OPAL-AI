@@ -38,6 +38,7 @@ export default function HospitalDashboard() {
   const router = useRouter();
   const [role, setRole] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isVerified, setIsVerified] = useState<boolean>(true);
 
   useEffect(() => {
     async function checkRole() {
@@ -48,7 +49,25 @@ export default function HospitalDashboard() {
       
       if (!userRole || (userRole !== "hospital" && userRole !== "admin")) {
         router.push("/dashboard");
+        return;
       }
+      
+      if (userRole === "hospital") {
+        const { data: hospitalData } = await supabase
+          .from("hospitals")
+          .select("is_verified")
+          .eq("user_id", user?.id)
+          .single();
+          
+        if (hospitalData && !hospitalData.is_verified) {
+          setIsVerified(false);
+        } else {
+          setIsVerified(true);
+        }
+      } else {
+        setIsVerified(true); // admin is immune
+      }
+      
       setAuthLoading(false);
     }
     checkRole();
@@ -96,6 +115,30 @@ export default function HospitalDashboard() {
           <p className="text-muted-foreground text-sm font-medium">Redirecting you to the safe zone...</p>
         </div>
       );
+  }
+
+  if (!isVerified) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh] space-y-6 max-w-lg mx-auto text-center px-4">
+        <div className="h-20 w-20 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 border border-yellow-500/20">
+          <ShieldCheck className="h-10 w-10" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-black font-display text-foreground mb-2">Pending Verification</h1>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Your hospital registration has been received and is currently under review by the OPAL-AI Medical Board. 
+            For security reasons, access to the Neural Matching Engine is restricted until your medical licenses are validated.
+          </p>
+        </div>
+        <div className="p-4 bg-muted/40 rounded-xl border border-border w-full flex items-start gap-3 text-left">
+          <Clock className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-foreground">Estimated Wait Time: 24-48 Hours</p>
+            <p className="text-xs text-muted-foreground mt-1">Our team will contact you via email once approved.</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

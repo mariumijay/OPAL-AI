@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import { useCityDonorStats } from "@/hooks/useSupabaseData";
-import { mockCityStats } from "@/data/mock";
 import { SkeletonChart } from "@/components/shared/Skeleton";
 import {
   BarChart,
@@ -17,8 +16,7 @@ import {
 export function PublicStats() {
   const { data: liveStats, isLoading } = useCityDonorStats();
 
-  // Use live data if available, fall back to mock
-  const cityStats = liveStats && liveStats.length > 0 ? liveStats : mockCityStats;
+  const cityStats = liveStats || [];
 
   const chartData = cityStats.map((c) => ({
     city: c.city,

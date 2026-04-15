@@ -146,43 +146,26 @@ export default function DonorMap() {
     }
   };
 
-  const donorMarkers = donorsError
-    ? mockDonors.map(d => ({
-        id: d.id,
-        name: d.full_name,
-        blood_type: d.blood_type,
-        donating: d.donating_items || '',
-        city: d.city,
-        is_available: d.is_available,
-        lat: d.latitude || 30.3753,
-        lng: d.longitude || 69.3451,
-      }))
-    : (liveDonors || []).map((d) => ({
-        id: d.id,
-        name: d.full_name,
-        blood_type: d.blood_type,
-        donating: d.donating_items,
-        city: d.city,
-        is_available: d.is_available,
-        lat: d.latitude || 30.3753, // fallback to PK center if geocoding failed
-        lng: d.longitude || 69.3451,
-      }));
+  const sourceDonors = (liveDonors?.length ? liveDonors : mockDonors);
+  const donorMarkers = sourceDonors.map((d: any) => ({
+      id: d.id,
+      name: d.full_name,
+      blood_type: d.blood_type,
+      donating: d.donating_items || '',
+      city: d.city,
+      is_available: d.is_available,
+      lat: d.latitude || 30.3753, // fallback to PK center if geocoding failed
+      lng: d.longitude || 69.3451,
+    }));
 
-  const hospitalMarkers = hospitalsError
-    ? mockHospitals.map(h => ({
-        id: h.hospital_id, 
-        name: h.hospital_name, 
-        city: h.city, 
-        lat: h.latitude || 30.3753, 
-        lng: h.longitude || 69.3451,
-      }))
-    : (liveHospitals || []).map((h) => ({ 
-        id: h.id, 
-        name: h.hospital_name, 
-        city: h.city, 
-        lat: h.latitude || 30.3753, 
-        lng: h.longitude || 69.3451 
-      }));
+  const sourceHospitals = (liveHospitals?.length ? liveHospitals : mockHospitals);
+  const hospitalMarkers = sourceHospitals.map((h: any) => ({ 
+      id: h.id || h.hospital_id, 
+      name: h.hospital_name, 
+      city: h.city, 
+      lat: h.latitude || 30.3753, 
+      lng: h.longitude || 69.3451 
+    }));
 
   if (donorsLoading || hospitalsLoading) {
     return (

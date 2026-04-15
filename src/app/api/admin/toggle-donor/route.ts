@@ -40,7 +40,18 @@ export async function POST(request: Request) {
       .single();
 
     if (fetchError || !donor) {
-      throw new Error(`Donor not found: ${donor_id}`);
+      throw new Error(`Donor record not found for ID: ${donor_id}`);
+    }
+
+    // Fallback: If email not in specialized table, look up from auth
+    let donorEmail = donor.email;
+    if (!donorEmail && donor.user_id) {
+      const { data: authUser } = await adminClient.auth.admin.getUserById(donor.user_id);
+      donorEmail = authUser?.user?.email || null;
+    }
+
+    if (!donorEmail) {
+      throw new Error(`No email found for donor ID: ${donor_id}. Cannot send notification.`);
     }
 
     // 1. Update specialized table using service client (bypasses RLS)
@@ -62,15 +73,22 @@ export async function POST(request: Request) {
       }).eq("user_id", donor.user_id);
     }
 
-    // 3. Send Email (Non-blocking)
+    // 3. Send Email (Awaited for total confirmation)
     try {
       if (nextStatus) {
-        await sendDonorReActivationEmail(donor.email, donor.full_name);
+        await sendDonorReActivationEmail(donorEmail, donor.full_name || "Life-Saver");
       } else {
-        await sendDonorSuspensionEmail(donor.email, donor.full_name, reason || "Administrative Review");
+        await sendDonorSuspensionEmail(donorEmail, donor.full_name || "Life-Saver", reason || "Administrative Protocol Review");
       }
-    } catch (emailError) {
-      console.error("Notification email failed, but DB updated:", emailError);
+    } catch (emailError: any) {
+      console.error("Critical Notification Error:", emailError);
+      // We still return success for DB because database MUST stay updated, 
+      // but we add a warning in the response.
+      return NextResponse.json({ 
+        success: true, 
+        newStatus: nextStatus, 
+        warning: "Database updated but notification email failed to deliver: " + emailError.message 
+      });
     }
 
     return NextResponse.json({ success: true, newStatus: nextStatus });

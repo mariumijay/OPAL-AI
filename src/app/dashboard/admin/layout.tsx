@@ -13,11 +13,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const supabase = createClient();
 
   useEffect(() => {
-    // EMERGENCY BYPASS - Forced authentication for control room access
-    setIsAuthorized(true);
-    setLoading(false);
-    
-    /*
     async function verifyAdmin() {
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -27,6 +22,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
 
       const role = session.user.user_metadata?.role;
+      // Also allow the specific master email as a fallback
       const isAdminEmail = session.user.email === "ranahaseeb9427@gmail.com";
 
       if (role !== "admin" && !isAdminEmail) {
@@ -40,7 +36,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
 
     verifyAdmin();
-    */
   }, [router, supabase]);
 
 

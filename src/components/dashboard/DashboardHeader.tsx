@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LogOut, User, Bell, Search, Settings } from "lucide-react";
+import { LogOut, User, Bell, Search, Settings, Command } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { LogoutModal } from "../layout/LogoutModal";
 import { toast } from "sonner";
 import { useRouter, usePathname } from "next/navigation";
 import { NotificationCenter } from "../layout/NotificationCenter";
+import { CommandSearch } from "../layout/CommandSearch";
 
 export function DashboardHeader() {
   const [user, setUser] = useState<any>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const supabase = createClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -31,6 +35,24 @@ export function DashboardHeader() {
     } catch (e) {
       toast.error("Logout failed");
     }
+  };
+
+  const handleSearch = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setIsSearching(true);
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 1200)),
+      {
+        loading: `Neural Indexing: "${searchQuery}"...`,
+        success: (data) => {
+          setIsSearching(false);
+          return `Global search complete. No matches for "${searchQuery}" in this node.`;
+        },
+        error: "Search failed",
+      }
+    );
   };
 
   // Get Page Title from Path
@@ -58,18 +80,27 @@ export function DashboardHeader() {
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-muted/30 border border-border rounded-2xl mr-4 group focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-          <Search className="h-4 w-4 text-muted-foreground group-focus-within:text-primary" />
-          <input 
-            type="text" 
-            placeholder="Search records..." 
-            className="bg-transparent border-none text-xs focus:outline-none w-32 lg:w-48"
-          />
+        <div 
+          onClick={() => setIsSearchOpen(true)}
+          className="hidden sm:flex items-center gap-2 px-4 py-2 bg-muted/30 border border-border rounded-2xl mr-4 group hover:ring-2 hover:ring-primary/20 transition-all cursor-text"
+        >
+          <Search className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+          <div className="text-muted-foreground/50 text-xs w-32 lg:w-48 select-none">
+            Search records...
+          </div>
+          <div className="hidden lg:flex items-center gap-1 px-1.5 py-0.5 bg-muted border border-border rounded text-[9px] font-black text-muted-foreground">
+            <Command className="h-2 w-2" /> K
+          </div>
         </div>
 
         <NotificationCenter />
         
         <div className="h-8 w-px bg-border mx-2" />
+
+        <CommandSearch 
+          isOpen={isSearchOpen} 
+          onClose={() => setIsSearchOpen(false)} 
+        />
 
         <div className="flex items-center gap-3 pl-2">
           <div className="text-right hidden sm:block">

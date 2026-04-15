@@ -1,9 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Heart, MapPin, Activity, ShieldCheck, ArrowUpRight } from "lucide-react";
+import { Heart, MapPin, Activity, ShieldCheck, ArrowUpRight, ClipboardList, Info, AlertTriangle, CheckCircle2 } from "lucide-react";
 import type { Match } from "@/lib/types";
-
+import { AIAnalysisButton } from "./AIAnalysisButton";
+import { SuccessPrediction } from "./SuccessPrediction";
 interface MatchCardProps {
   match: Match;
   onProcure: (match: Match) => void;
@@ -20,6 +21,8 @@ export function MatchCard({ match, onProcure, index = 0 }: MatchCardProps) {
     match.match_score >= 80 ? "bg-green-500" : 
     match.match_score >= 60 ? "bg-yellow-500" : 
     "bg-red-500";
+
+  const isOrgan = !!match.organ_type;
 
   return (
     <motion.div
@@ -75,27 +78,90 @@ export function MatchCard({ match, onProcure, index = 0 }: MatchCardProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-4">
         <div className="p-3 rounded-xl bg-muted/50 border border-border">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Blood Group</p>
-          <p className="text-sm font-bold text-primary">{match.blood_type}</p>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">{isOrgan ? "Target Organ" : "Blood Group"}</p>
+          <div className="flex items-center gap-2">
+            {isOrgan && <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(220,38,38,0.6)]" />}
+            <p className="text-sm font-bold text-primary">{isOrgan ? match.organ_type : match.blood_type}</p>
+          </div>
         </div>
         <div className="p-3 rounded-xl bg-muted/50 border border-border">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Status</p>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Clinic Status</p>
           <div className="flex items-center gap-1.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-            <p className="text-sm font-bold text-foreground">Immediate</p>
+            <div className={`h-1.5 w-1.5 rounded-full ${isOrgan ? "bg-warning" : "bg-success"} animate-pulse`} />
+            <p className="text-sm font-bold text-foreground">{isOrgan ? "Screening Ready" : "Immediate"}</p>
           </div>
         </div>
       </div>
 
+      {isOrgan && (
+        <div className="mb-6 p-4 rounded-2xl bg-primary/5 border border-primary/10 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-[10px] font-black text-primary uppercase tracking-[0.15em] flex items-center gap-2">
+              <ClipboardList className="h-3 w-3" /> Medical Protocol Required
+            </h4>
+            <div className="flex items-center gap-1 text-[8px] font-bold text-muted-foreground uppercase">
+              <Info className="h-2.5 w-2.5" /> Stage 1/4
+            </div>
+          </div>
+          <div className="space-y-2">
+             <div className="flex items-center gap-2 text-[10px] font-bold text-foreground opacity-80">
+               <CheckCircle2 className="h-3 w-3 text-success shrink-0" />
+               Identity Verified & Legal Consent Logged
+             </div>
+             <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground">
+               <div className="h-3 w-3 rounded-full border border-border shrink-0" />
+               Schedule HLA Tissue Typing (Physical Call)
+             </div>
+             <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground">
+               <div className="h-3 w-3 rounded-full border border-border shrink-0" />
+               Cross-match Serology Verification
+             </div>
+          </div>
+          <div className="pt-2 flex items-center gap-2 text-[9px] font-bold text-warning uppercase tracking-tighter">
+             <AlertTriangle className="h-3 w-3" /> High Precision Logistics Mandatory
+          </div>
+        </div>
+      )}
+
+      <SuccessPrediction
+        matchScore={match.match_score}
+        distanceKm={match.distance_km || 0}
+        bloodType={match.blood_type || "Unknown"}
+        urgencyLevel={match.urgency || "routine"}
+        donationType={match.organ_type ? "organ" : "blood"}
+        donorCity={"Unknown"}
+        hospitalCity={"Unknown"}
+      />
+
       <button
         onClick={() => onProcure(match)}
-        className="w-full py-4 rounded-xl bg-foreground text-background font-black text-xs uppercase tracking-[0.2em] transition-all hover:bg-primary hover:text-white flex items-center justify-center gap-2 group/btn"
+        className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 group/btn ${
+          isOrgan 
+            ? "bg-primary text-white hover:bg-primary/90 shadow-xl shadow-primary/20" 
+            : "bg-foreground text-background hover:bg-primary hover:text-white"
+        }`}
       >
-        Initiate Procurement
+        {isOrgan ? "Initiate Clinical Screening" : "Initiate Procurement"}
         <ArrowUpRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1" />
       </button>
+
+      <AIAnalysisButton
+        matchData={{
+          donorBloodType: match.blood_type,
+          recipientBloodType: "Required Type", // Hardcoded since we don't have recipient type injected in this component yet
+          requiredOrgan: match.organ_type || undefined,
+          matchScore: match.match_score,
+          distanceKm: match.distance_km || 0,
+          urgencyLevel: match.urgency || "routine",
+          donorCity: "Unknown",
+          recipientCity: "Unknown",
+          compatibilityPoints: match.score_breakdown ? match.score_breakdown.compatibility : Math.round(match.match_score * 0.5),
+          distancePoints: match.score_breakdown ? match.score_breakdown.distance : Math.round(match.match_score * 0.3),
+          urgencyPoints: match.score_breakdown ? match.score_breakdown.urgency : Math.round(match.match_score * 0.2),
+        }}
+      />
 
       {/* Decorative pulse for high matches */}
       {match.match_score > 90 && (

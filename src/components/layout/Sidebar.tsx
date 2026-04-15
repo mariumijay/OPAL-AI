@@ -60,7 +60,21 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const collapsed = !isOpen;
+
+  useState(() => {
+    async function loadUser() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserRole(user.user_metadata?.role);
+        setUserEmail(user.email || null);
+      }
+    }
+    loadUser();
+  });
 
   const handleLogout = async () => {
     try {
@@ -169,20 +183,19 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
           })}
         </nav>
 
-        {/* Quick Role Switch (for demo) */}
-        {!collapsed && (
-          <div className="px-3 py-2 border-t border-border">
-            {/* Same switch logic as before */}
-            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2 px-3">
-              Switch View
+        {/* Quick Role Switch (ONLY for Master Admins) */}
+        {!collapsed && (userRole === "admin" || userEmail === "ranahaseeb9427@gmail.com") && (
+          <div className="px-3 py-2 border-t border-border bg-primary/5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 px-3">
+              Admin Controls
             </p>
             <div className="space-y-1">
               {[
-                { href: "/dashboard/hospital", label: "Hospital", icon: LayoutDashboard },
-                { href: "/dashboard/donor", label: "Donor", icon: User },
-                { href: "/dashboard/admin", label: "Admin", icon: ShieldCheck },
+                { href: "/dashboard/hospital", label: "Hospital View", icon: LayoutDashboard },
+                { href: "/dashboard/donor", label: "Donor View", icon: User },
+                { href: "/dashboard/admin", label: "Admin View", icon: ShieldCheck },
               ].map(r => (
-                 <Link key={r.href} href={r.href} className={cn("flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs", pathname.startsWith(r.href) ? "text-primary font-bold" : "text-muted-foreground")}>
+                 <Link key={r.href} href={r.href} className={cn("flex items-center gap-2 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight transition-colors", pathname.startsWith(r.href) ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground")}>
                    <r.icon className="h-3.5 w-3.5" /> {r.label}
                  </Link>
               ))}
