@@ -24,6 +24,16 @@
 .DS_Store
 *.pem
 
+# Agent & IDE Metadata
+brain/
+.vibecheck/
+.islstudio/
+scratch/
+.claude/
+.cursor/
+.kilo/
+.gemini/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -39,3 +49,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Agent & IDE Metadata (Wasted Files)
+brain/
+.vibecheck/
+.islstudio/
+scratch/
+.claude/
+.cursor/
+.kilo/
+.gemini/
