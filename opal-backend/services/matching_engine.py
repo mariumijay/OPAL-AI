@@ -31,53 +31,117 @@ def is_blood_compatible(donor_type: str, recipient_type: str) -> bool:
     }
     return recipient_type in compatibility.get(donor_type, [])
 
+import joblib
+import os
+
 class AIMatchingModel:
     """
-    Professional AI Matching Engine structure.
-    This simulates a trained Machine Learning model evaluating donor-recipient compatibility.
+    Professional AI Matching Engine structure using trained Machine Learning models.
     """
     def __init__(self):
-        # In production, this would initialize your TensorFlow/Scikit-Learn models.
+        self.model = None
         self.weights = {
             'blood_compatibility': 0.40,
             'distance_decay': 0.30,
             'age_differential': 0.15,
             'health_score': 0.15
         }
+        
+        # Try loading actual trained model
+        model_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'match_model.joblib')
+        if os.path.exists(model_path):
+            try:
+                self.model = joblib.load(model_path)
+                print(f"[AI ENGINE] Loaded trained ML model from {model_path}")
+            except Exception as e:
+                print(f"[AI ENGINE] Failed to load model: {e}")
 
-    def _extract_features(self, donor: dict, recipient_lat: float, recipient_lon: float) -> dict:
+    def _extract_machine_features(self, donor: dict) -> np.ndarray:
+        """Transforms raw database JSON into the exact 24 features expected by the Random Forest model."""
+        # 24 features aligned with train_model.py
+        
+        # Basic Info
+        age = donor.get('age', 30)
+        gender_Male = 1 if donor.get('gender', '') == 'Male' else 0
+        
+        # Organs (Default 0, check if provided in donor)
+        blood = 1 if donor.get('donation_type') == 'blood' else 0
+        bone_marrow = 1 if donor.get('donation_type') == 'organ' and 'Bone Marrow' in str(donor.get('organ_type', '')) else 0
+        cornea = 1 if donor.get('donation_type') == 'organ' and 'Corne' in str(donor.get('organ_type', '')) else 0
+        heart = 1 if donor.get('donation_type') == 'organ' and 'Heart' in str(donor.get('organ_type', '')) else 0
+        kidney = 1 if donor.get('donation_type') == 'organ' and 'Kidney' in str(donor.get('organ_type', '')) else 0
+        liver = 1 if donor.get('donation_type') == 'organ' and 'Liver' in str(donor.get('organ_type', '')) else 0
+        lung = 1 if donor.get('donation_type') == 'organ' and 'Lung' in str(donor.get('organ_type', '')) else 0
+        pancreas = 1 if donor.get('donation_type') == 'organ' and 'Pancreas' in str(donor.get('organ_type', '')) else 0
+        plasma = 0
+        platelet = 0
+        skin = 0
+        
+        # Conditions
+        cond_diabetes = 1 if donor.get('is_diabetic') else 0
+        cond_hypertension = 0 # Not explicitly in basic donor model
+        cond_heart_disease = 0
+        
+        # Blood Types
+        bt = donor.get('blood_type', '')
+        b_A_pos = 1 if bt == 'A+' else 0
+        b_A_neg = 1 if bt == 'A-' else 0
+        b_AB_pos = 1 if bt == 'AB+' else 0
+        b_AB_neg = 1 if bt == 'AB-' else 0
+        b_B_pos = 1 if bt == 'B+' else 0
+        b_B_neg = 1 if bt == 'B-' else 0
+        b_O_pos = 1 if bt == 'O+' else 0
+        b_O_neg = 1 if bt == 'O-' else 0
+        
+        return np.array([[
+            age, gender_Male, blood, bone_marrow, cornea, heart, 
+            kidney, liver, lung, pancreas, plasma, platelet, skin,
+            cond_diabetes, cond_hypertension, cond_heart_disease,
+            b_A_pos, b_A_neg, b_AB_pos, b_AB_neg, b_B_pos, b_B_neg, b_O_pos, b_O_neg
+        ]])
+
+    def _extract_heuristic_features(self, donor: dict, recipient_lat: float, recipient_lon: float) -> dict:
         """Transforms raw database JSON into ML-ready numerical features."""
         distance = haversine(
             recipient_lat, recipient_lon, 
             donor.get('latitude', 0.0), donor.get('longitude', 0.0)
         )
         
-        # Normalize distance (Assuming max typical distance is 500km)
         dist_score = max(0, 1 - (distance / 500.0))
         
-        # Calculate Health Score (1.0 is perfectly healthy)
         health_penalties = 0.0
         if donor.get('is_smoker', False): health_penalties += 0.2
         if donor.get('is_diabetic', False): health_penalties += 0.3
         health_score = max(0.1, 1.0 - health_penalties)
         
-        # Age Differential (Simulated optimum is younger donors)
         donor_age = donor.get('age', 30)
         age_score = max(0, 1 - (donor_age / 100.0))
         
         return {
             'distance_km': distance,
-            'features': np.array([1.0, dist_score, age_score, health_score]) # 1.0 is blood compat (since already filtered)
+            'features': np.array([1.0, dist_score, age_score, health_score])
         }
 
-    def predict_match_probability(self, features: np.ndarray) -> float:
+    def predict_match_probability(self, donor: dict, recipient_lat: float, recipient_lon: float) -> tuple[float, float]:
         """
         Runs the ML Inference. 
-        (Replace this dot product with `model.predict_proba()` in production).
+        Returns (Match Percentage, Distance in km)
         """
-        weight_vector = np.array(list(self.weights.values()))
-        probability = np.dot(features, weight_vector)
-        return round(probability * 100, 2)  # Return percentage
+        # Get distance from heuristic extraction
+        heuristic = self._extract_heuristic_features(donor, recipient_lat, recipient_lon)
+        distance = heuristic['distance_km']
+
+        if self.model: # Use Trained AI Model
+            ml_features = self._extract_machine_features(donor)
+            prediction = self.model.predict(ml_features)[0]
+            # Incorporate distance decay into the ML prediction natively
+            dist_score = max(0, 1 - (distance / 500.0))
+            probability = (prediction * 0.7) + (dist_score * 0.3)
+        else: # Fallback to heuristic
+            weight_vector = np.array(list(self.weights.values()))
+            probability = np.dot(heuristic['features'], weight_vector)
+            
+        return round(probability * 100, 2), distance
 
 # Instantiate global matching model
 ai_matcher = AIMatchingModel()
@@ -94,28 +158,24 @@ def calculate_match_results(
     matches = []
     
     for donor in donors:
-        # 1. Artificial Intelligence Feature Extraction
-        extraction = ai_matcher._extract_features(donor, hospital_lat, hospital_lon)
-        distance = extraction['distance_km']
+        # 1. AI Model Inference (Scoring & Feature Extraction)
+        match_probability, distance = ai_matcher.predict_match_probability(
+            donor, hospital_lat, hospital_lon
+        )
         
         if distance > max_distance:
             continue
-            
-        # 2. Model Inference (Scoring)
-        match_probability = ai_matcher.predict_match_probability(extraction['features'])
         
-        # 3. Format Response
+        # 2. Format Response
         matches.append(MatchResponse(
             id=donor['id'],
             full_name=donor['full_name'],
             blood_type=donor['blood_type'],
             distance_km=distance,
             city=donor['city'],
-            phone=donor['phone'],
-            # Note: In a real scenario, you'd update MatchResponse to accept a match_score field
+            phone=donor['phone']
         ))
         
-        # Dynamically append score if you want to extend the pydantic model later
         matches[-1].match_score = match_probability 
 
     # Sort by AI Match Probability (Highest First)

@@ -14,7 +14,9 @@ import {
   ToggleLeft,
   ToggleRight,
   Trash2,
-  Ban
+  Ban,
+  Download,
+  DatabaseIcon
 } from "lucide-react";
 import { StatsCard } from "@/components/shared/StatsCard";
 import { toast } from "sonner";
@@ -190,8 +192,43 @@ export default function AdminDashboard() {
     );
   }
 
+  const handleDownloadDataset = async () => {
+    try {
+      toast.info("Preparing dataset export...");
+      const res = await fetch("/api/admin/download-dataset");
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `OPAL-AI-Dataset-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Dataset exported successfully!");
+    } catch (err: any) {
+      toast.error("Export failed: " + err.message);
+    }
+  };
+
   return (
     <div className="space-y-10 pb-20">
+      {/* HEADER */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-black font-display tracking-tight text-foreground uppercase">Command Center</h1>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">OPAL-AI Administrative Console</p>
+        </div>
+        <button
+          onClick={handleDownloadDataset}
+          className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-primary text-primary-foreground font-black text-sm uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/30"
+        >
+          <Download className="w-4 h-4" />
+          Export Dataset
+        </button>
+      </div>
+
       {/* SECTION 1: Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard 
