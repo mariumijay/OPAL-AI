@@ -8,6 +8,8 @@ export type UrgencyLevel = 'Emergency' | 'Urgent' | 'Routine';
 export type MatchStatus = 'pending' | 'approved' | 'completed' | 'rejected';
 export type CompatibilityLevel = 'full' | 'compatible' | 'incompatible';
 export type RequestType = 'blood' | 'organ';
+export type UserRole = 'donor' | 'hospital' | 'doctor' | 'admin';
+export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'flagged';
 
 export interface DonorRequestFormData {
   request_type: RequestType;
@@ -210,6 +212,9 @@ export interface Donor {
   cause_of_death?: string | null;
   donor_type?: 'blood' | 'organ';
   suspension_reason?: string;
+  verification_status: VerificationStatus;
+  verified_by_id?: string;
+  medical_document_url?: string;
 
   created_at: string;
 }

@@ -19,6 +19,7 @@ import {
   DatabaseIcon
 } from "lucide-react";
 import { StatsCard } from "@/components/shared/StatsCard";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import { 
@@ -310,11 +311,12 @@ export default function AdminDashboard() {
                 </tr>
               ) : pendingApprovals.length === 0 ? (
                 <tr>
-                   <td colSpan={6} className="p-20 text-center">
-                      <div className="flex flex-col items-center gap-4 opacity-30">
-                         <Check className="w-12 h-12 text-green-500" />
-                         <p className="text-sm font-bold text-foreground italic underline decoration-primary decoration-4">All Clear. No Pending Applications.</p>
-                      </div>
+                   <td colSpan={6} className="p-12">
+                      <EmptyState 
+                        title="No Pending Applications"
+                        description="All medical credentials and facility applications have been processed. Systems are current."
+                        icon="search"
+                      />
                    </td>
                 </tr>
               ) : (

@@ -21,12 +21,24 @@ import {
   Loader2
 } from "lucide-react";
 import { toast } from "sonner";
-import { useBloodDonors, useOrganDonors } from "@/hooks/useSupabaseData";
+import { useQuery } from "@tanstack/react-query";
 import { Donor } from "@/lib/types";
 
 export default function AdminDonorsPage() {
-  const { data: bloodDonors, refetch: refetchBlood } = useBloodDonors();
-  const { data: organDonors, refetch: refetchOrgan } = useOrganDonors();
+  const { data, refetch: refetchDonors } = useQuery({
+    queryKey: ['admin_all_donors'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/donors');
+      if (!res.ok) throw new Error("Failed to fetch donor list");
+      return await res.json();
+    },
+    refetchInterval: 15000, // Sync every 15s
+  });
+
+  const bloodDonors = data?.bloodDonors;
+  const organDonors = data?.organDonors;
+  const refetchBlood = refetchDonors;
+  const refetchOrgan = refetchDonors;
   const [selectedDonor, setSelectedDonor] = useState<Donor | null>(null);
   
   // Suspension State

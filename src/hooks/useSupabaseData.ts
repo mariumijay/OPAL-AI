@@ -3,6 +3,7 @@
 import { useQuery, UseQueryResult } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { OpalMatchingEngine, MatchFeatures } from "@/lib/ai-engine";
 import {
   mapDonor,
   mapBloodDonor,
@@ -137,113 +138,50 @@ export function useMatchResults(): UseQueryResult<Match[]> {
 
 const BACKEND_URL = "http://localhost:8000";
 
-interface FastAPIMatch {
-  id: string;
-  full_name: string;
-  blood_type: string;
-  distance_km: number;
-}
-
-interface FastAPIMatchResponse {
-  matches: FastAPIMatch[];
-}
-
 export function useFindDonors(
   params: { bloodType?: string; organType?: string; city: string; urgency: string },
   enabled: boolean = true
 ): UseQueryResult<Match[]> {
   return useQuery<Match[]>({
-    queryKey: ["find_donors_fastapi", params],
+    queryKey: ["find_donors_v2", params],
     enabled: enabled && !!params.urgency,
     queryFn: async (): Promise<Match[]> => {
-      // Fetch current session for real hospital ID
+      // 1. Fetch data from Supabase (Filtering at Source for Performance)
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const hospitalId = session?.user?.id;
-      if (!hospitalId && enabled) throw new Error("Hospital authentication required");
-      
-      const endpoint = params.organType ? "/api/matching/organ" : "/api/matching/blood";
-      
-      let result: FastAPIMatchResponse;
-      try {
-        const response = await fetch(`${BACKEND_URL}${endpoint}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            hospital_id: hospitalId || "demo-hospital", // Fallback for demo
-            required_blood_type: params.bloodType || "O+", 
-            required_organ: params.organType || null,
-            urgency_level: params.urgency.toLowerCase(),
-            max_distance_km: 100.0 // Adjusted for scoring
-          })
-        });
+      const table = params.organType ? 'organ_donors' : 'blood_donors';
+      const { data: rawDonors, error } = await supabase
+        .from(table)
+        .select("*")
+        .eq('is_available', true);
 
-        if (!response.ok) {
-          throw new Error("FastAPI Matcher Error");
-        }
-        result = await response.json() as FastAPIMatchResponse;
-      } catch (error) {
-        console.warn("Python matching engine offline, falling back to synthetic engine...");
-        const { mockDonors } = await import('@/data/mock');
-        
-        // Filter mock donors directly based on requirements & city
-        const validDonors = mockDonors.filter(d => {
-          const typeMatch = params.organType 
-            ? d.donating_items?.toLowerCase().includes((params.organType || '').toLowerCase())
-            : d.blood_type === params.bloodType;
-            
-          // In an emergency demo context, if no exact city match exists, show nearby/other cities.
-          // But strict matching wants exact city. Let's filter by city.
-          const cityMatch = d.city?.toLowerCase() === params.city.toLowerCase();
-          
-          return typeMatch && cityMatch;
-        });
+      if (error) throw error;
 
-        result = {
-          matches: validDonors.map(d => ({
-            id: d.id,
-            full_name: d.full_name,
-            blood_type: d.blood_type,
-            distance_km: Math.random() * 50 + 2 // randomize distance for demo
-          }))
+      // 2. Process matches through the AI Matching Engine
+      return (rawDonors || []).map((donor: any) => {
+        const features: MatchFeatures = {
+          bloodCompatibility: donor.blood_type === params.bloodType ? 1.0 : 0.8, // Simplified logic
+          distanceKm: donor.city.toLowerCase() === params.city.toLowerCase() ? 5 : 50,
+          urgencyLevel: params.urgency as any,
+          donorReliability: 0.9, // This would be dynamic in production
+          medicalVerified: donor.verification_status === 'verified'
         };
-      }
-      
-      return result.matches.map((match) => {
-        // --- SRS Scoring Formula ---
-        // Final = Compatibility(0.50) + Distance(0.30) + Urgency(0.20)
-        
-        let compatScore = 0;
-        if (match.blood_type === params.bloodType) compatScore = 100;
-        else if (match.blood_type === 'O-') compatScore = 95;
-        else compatScore = 85; // Simple compatible check for demo
 
-        const maxRadius = 100.0;
-        const distScore = Math.max(0, 100 - (match.distance_km / maxRadius * 100));
-
-        let urgScore = 50;
-        if (params.urgency === 'Emergency') urgScore = 100;
-        else if (params.urgency === 'Urgent') urgScore = 75;
-
-        const finalScore = (compatScore * 0.5) + (distScore * 0.3) + (urgScore * 0.2);
+        const score = OpalMatchingEngine.calculateMatchProbability(features);
+        const insight = OpalMatchingEngine.getMatchInsights(score, features);
 
         return {
-          id: `api-match-${match.id}`,
-          donor_id: match.id,
-          donor_name: match.full_name,
-          match_score: Math.round(finalScore),
-          score_breakdown: {
-            compatibility: Math.round(compatScore * 0.5),
-            distance: Math.round(distScore * 0.3),
-            urgency: Math.round(urgScore * 0.2)
-          },
+          id: `match-${donor.id}`,
+          donor_id: donor.id,
+          donor_name: donor.full_name,
+          match_score: score,
+          insight: insight, // Transparency for Admin/Hospital
           compatibility: "compatible" as const,
-          distance_km: parseFloat(match.distance_km.toFixed(1)),
+          distance_km: features.distanceKm,
           status: 'pending',
           urgency: params.urgency,
-          blood_type: match.blood_type,
-          cnic: "—", // Added to fix type error
-          hospital_name: 'Current Facility',
+          blood_type: donor.blood_type,
+          cnic: donor.cnic || "---",
+          hospital_name: 'Current Search',
           created_at: new Date().toISOString(),
         };
       }).sort((a, b) => b.match_score - a.match_score);
@@ -297,27 +235,13 @@ export function useGlobalStats(): UseQueryResult<GlobalStats> {
   return useQuery<GlobalStats>({
     queryKey: ["global_stats"],
     queryFn: async (): Promise<GlobalStats> => {
-      const supabase = createClient();
-      
-      const [
-        bloodRes,
-        organRes,
-        hospitalsRes,
-        matchesRes
-      ] = await Promise.all([
-        supabase.from("blood_donors").select("*", { count: 'exact', head: true }),
-        supabase.from("organ_donors").select("*", { count: 'exact', head: true }),
-        supabase.from("hospitals").select("*", { count: 'exact', head: true }),
-        supabase.from("match_results").select("id")
-      ]);
-
-      return {
-        totalDonors: (bloodRes.count || 0) + (organRes.count || 0),
-        totalHospitals: hospitalsRes.count || 0,
-        livesSaved: matchesRes.data?.length || 0, 
-        citiesCovered: 12 // Simplified for visual dashboard
-      };
+      const res = await fetch("/api/public/stats");
+      if (!res.ok) {
+        throw new Error("Failed to fetch live stats");
+      }
+      return await res.json();
     },
+    refetchInterval: 30000, // True Real-Time (polling every 30s)
   });
 }
 

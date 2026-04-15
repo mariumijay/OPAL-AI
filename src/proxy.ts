@@ -58,17 +58,37 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Logged in — Check Approval for Dashboards
+  // Redirect authenticated users away from auth pages
+  if (user && pathname.startsWith("/auth") && !pathname.includes('pending-approval')) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
+  // Logged in — Check Approval and Handle RBAC for Dashboards
   if (pathname.startsWith('/dashboard')) {
     const role = user.user_metadata?.role;
+    const email = user.email;
 
-    // Admin always allowed
-    if (role === 'admin' || user.email === "ranahaseeb9427@gmail.com") {
+    // Admin Routing
+    if (role === 'admin' || email === "ranahaseeb9427@gmail.com") {
+      if (pathname === '/dashboard' || (!pathname.startsWith('/dashboard/admin'))) {
+        return NextResponse.redirect(new URL('/dashboard/admin', request.url));
+      }
       return response;
+    }
+
+    // Role-based Root Dashboard Routing
+    if (pathname === '/dashboard') {
+      if (role === 'hospital') return NextResponse.redirect(new URL('/dashboard/hospital', request.url));
+      if (role === 'doctor') return NextResponse.redirect(new URL('/dashboard/doctor', request.url));
+      else return NextResponse.redirect(new URL('/dashboard/donor', request.url));
     }
 
     // Check Donor Approval
     if (role === 'donor') {
+      if (pathname.startsWith('/dashboard/admin') || pathname.startsWith('/dashboard/hospital')) {
+         return NextResponse.redirect(new URL('/dashboard/donor', request.url));
+      }
+
       const { data } = await supabase
         .from('blood_donors')
         .select('approval_status')
@@ -82,6 +102,10 @@ export async function proxy(request: NextRequest) {
 
     // Check Hospital Approval
     if (role === 'hospital') {
+      if (pathname.startsWith('/dashboard/admin') || pathname.startsWith('/dashboard/donor')) {
+         return NextResponse.redirect(new URL('/dashboard/hospital', request.url));
+      }
+
       const { data } = await supabase
         .from('hospitals')
         .select('approval_status')

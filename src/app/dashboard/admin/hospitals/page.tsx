@@ -3,12 +3,21 @@
 import { useState } from "react";
 import { Building2, Ban, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useHospitals } from "@/hooks/useSupabaseData";
+import { useQuery } from "@tanstack/react-query";
+import { Hospital } from "@/lib/types";
 
 export default function AdminHospitalsPage() {
-  const { data: allHospitals, refetch: refetchHospitals, isLoading } = useHospitals();
-  const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
+  const { data: allHospitals, refetch: refetchHospitals, isLoading } = useQuery<Hospital[]>({
+    queryKey: ['admin_all_hospitals'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/hospitals');
+      if (!res.ok) throw new Error("Failed to fetch hospitals");
+      return await res.json();
+    },
+    refetchInterval: 15000,
+  });
 
+  const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const verifiedHospitals = allHospitals?.filter(h => h.is_verified) || [];
 
   const toggleHospitalVerification = async (id: string, current: boolean) => {
@@ -66,21 +75,21 @@ export default function AdminHospitalsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {verifiedHospitals.map((h) => (
-                <tr key={h.hospital_id} className="hover:bg-muted/30 transition-colors">
+                <tr key={h.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-6 py-4 font-semibold">{h.hospital_name}</td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{h.city}</td>
                   <td className="px-6 py-4 text-sm font-mono">{h.license_number}</td>
                   <td className="px-6 py-4 flex gap-2">
                      <button 
-                      onClick={() => toggleHospitalVerification(h.hospital_id, true)}
-                      disabled={isActionLoading === h.hospital_id}
+                      onClick={() => toggleHospitalVerification(h.id, true)}
+                      disabled={isActionLoading === h.id}
                       className="p-2 rounded-lg text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-all disabled:opacity-50" 
                     >
                       <Ban className="w-4 h-4" />
                     </button>
                     <button 
-                      onClick={() => handleReject(h.hospital_id)}
-                      disabled={isActionLoading === h.hospital_id}
+                      onClick={() => handleReject(h.id)}
+                      disabled={isActionLoading === h.id}
                       className="p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all disabled:opacity-50" 
                     >
                       <Trash2 className="w-4 h-4" />
