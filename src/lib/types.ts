@@ -80,9 +80,6 @@ export interface OrganDonorRow {
   smoker: boolean;
   height_cm: number;
   weight_kg: number;
-  // Organ Specific Medical Fields
-  hiv_status: VerificationStatus;
-  hepatitis_status: VerificationStatus;
   smoking_history: boolean;
   medical_report_url?: string;
   next_of_kin_contact: string;
@@ -175,7 +172,7 @@ export interface Donor {
   full_name: string;
   first_name: string;
   last_name: string;
-  age: number; // calculated from birth_date
+  age: number; 
   gender: string;
   contact_number: string;
   blood_type: string;
@@ -184,13 +181,9 @@ export interface Donor {
   longitude: number | null;
   is_available: boolean;
   cnic: string;
-  
-  // Dynamic Items
   is_blood_donor: boolean;
   is_organ_donor: boolean;
-  donating_items: string; // Combined formatted string
-  
-  // Medical Profile (Joined)
+  donating_items: string;
   medical?: {
     hiv_status: string;
     hepatitis_status: string;
@@ -205,8 +198,6 @@ export interface Donor {
     next_of_kin_contact: string;
     consent_signed: boolean;
   };
-
-  // Optional fields for dashboard/mock compatibility
   hospital_name?: string;
   medical_conditions?: string;
   hepatitis_status?: string;
@@ -217,12 +208,11 @@ export interface Donor {
   verification_status: VerificationStatus;
   verified_by_id?: string;
   medical_document_url?: string;
-
   created_at: string;
 }
 
 export interface Hospital {
-  id: string; // Alias for hospital_id for map/compatibility
+  id: string; 
   hospital_id: string;
   hospital_name: string;
   license_number: string;

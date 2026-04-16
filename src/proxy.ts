@@ -58,8 +58,12 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Redirect authenticated users away from auth pages
-  if (user && pathname.startsWith("/auth") && !pathname.includes('pending-approval')) {
+  // Redirect authenticated users away from auth pages (Login, Forgot Password), 
+  // but allow access to registration pages to avoid 404/redirect loops during dev.
+  if (user && pathname.startsWith("/auth") && 
+      !pathname.includes('pending-approval') && 
+      !pathname.includes('donor/signup') && 
+      !pathname.includes('hospital/signup')) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 

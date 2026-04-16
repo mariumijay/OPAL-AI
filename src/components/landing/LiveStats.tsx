@@ -12,10 +12,16 @@ function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: str
 
   useEffect(() => {
     if (!inView) return;
+    if (target === 0) {
+      setCount(0);
+      return;
+    }
+    
     const duration = 2000;
     const steps = 60;
     const increment = target / steps;
     let current = 0;
+    
     const timer = setInterval(() => {
       current += increment;
       if (current >= target) {
@@ -25,6 +31,7 @@ function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: str
         setCount(Math.floor(current));
       }
     }, duration / steps);
+    
     return () => clearInterval(timer);
   }, [inView, target]);
 

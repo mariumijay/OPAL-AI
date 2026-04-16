@@ -12,8 +12,8 @@ class BloodDonorBase(BaseModel):
     hepatitis_status: Literal["Negative", "Positive"]
     medical_conditions: Optional[str] = None
     city: str
-    latitude: float
-    longitude: float
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     is_available: bool = True
 
     @field_validator('age')
