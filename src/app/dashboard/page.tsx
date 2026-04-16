@@ -25,7 +25,7 @@ export default function DashboardPage() {
         }
 
         const detectedRole = user.user_metadata?.role;
-        const isAdminEmail = user.email === "ranahaseeb9427@gmail.com";
+        const isAdminEmail = user.email?.toLowerCase() === "ranahaseeb9427@gmail.com";
         
         setRole(isAdminEmail ? "admin (override)" : (detectedRole || "No Role Assigned"));
 

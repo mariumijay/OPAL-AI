@@ -70,7 +70,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserRole(user.user_metadata?.role);
-        setUserEmail(user.email || null);
+        setUserEmail(user.email?.toLowerCase() || null);
       }
     }
     loadUser();
@@ -193,16 +193,17 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 { href: "/dashboard/donor", label: "Donor View", icon: User },
                 { href: "/dashboard/admin", label: "Admin View", icon: ShieldCheck },
               ].map(r => (
-                 <button 
+                 <Link 
                    key={r.href} 
-                   onClick={() => { window.location.href = r.href; }}
+                   href={`${r.href}?mode=admin_view`}
+                   prefetch={false}
                    className={cn(
-                     "flex items-center gap-2 rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-tight transition-all w-full text-left",
+                     "flex items-center gap-2 rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-tight transition-all",
                      pathname.startsWith(r.href) ? "text-primary bg-primary/20 shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                    )}
                  >
                    <r.icon className="h-3.5 w-3.5" /> {r.label}
-                 </button>
+                 </Link>
               ))}
             </div>
           </div>

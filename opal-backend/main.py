@@ -3,14 +3,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from routes import blood_donors, organ_donors, hospitals, matching
-from routes.matching import MLModelManager
+from routes.matching import get_model
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load the ML model once at startup
     print("--- [STARTUP] Initializing Production AI Matching Model v2 ---")
     try:
-        MLModelManager.get_model()
+        get_model()
     except Exception as e:
         print(f"FAILED TO LOAD ML MODEL: {e}")
     yield
@@ -25,10 +25,7 @@ app = FastAPI(
 
 # CORS Configuration
 # Standard for Next.js development projects
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,

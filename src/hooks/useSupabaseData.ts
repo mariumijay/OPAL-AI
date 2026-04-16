@@ -241,7 +241,7 @@ export function useGlobalStats(): UseQueryResult<GlobalStats> {
       }
       return await res.json();
     },
-    refetchInterval: 30000, // True Real-Time (polling every 30s)
+    refetchInterval: 10000, // Augmented Real-Time (polling every 10s)
   });
 }
 

@@ -23,7 +23,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       const role = session.user.user_metadata?.role;
       // Also allow the specific master email as a fallback
-      const isAdminEmail = session.user.email === "ranahaseeb9427@gmail.com";
+      const isAdminEmail = session.user.email?.toLowerCase() === "ranahaseeb9427@gmail.com";
 
       if (role !== "admin" && !isAdminEmail) {
         toast.error("Security Alert: Unauthorized access attempt to Command Center.");

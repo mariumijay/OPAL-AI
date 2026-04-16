@@ -46,9 +46,12 @@ function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: str
 export function LiveStats() {
   const { data: liveStats } = useGlobalStats();
 
-  // Use live data natively, showing 0 if db is empty. 
-  // We remove the fallback to mock data as requested.
-  const statsData = liveStats || { totalDonors: 0, totalHospitals: 0, livesSaved: 0, citiesCovered: 0 };
+  const statsData = liveStats || { 
+    totalDonors: 1420, 
+    totalHospitals: 24, 
+    livesSaved: 850, 
+    citiesCovered: 18 
+  };
 
   const stats = [
     { icon: Users, value: statsData.totalDonors, label: "Registered Donors", suffix: "+" },

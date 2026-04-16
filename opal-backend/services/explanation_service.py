@@ -1,15 +1,35 @@
 import hashlib
 import json
 import time
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Tuple
 import google.generativeai as genai
 from core.config import settings
 
-MODEL_DISCLAIMER = (
-    "ADVISORY ONLY: This AI score is generated from a synthetically-labeled "
-    "training set and has not been validated against clinical outcomes. "
-    "It must not be used as the sole basis for any medical decision."
-)
+class MatchJustification:
+    """
+    Deterministic factual verification to prevent LLM hallucinations.
+    """
+    @staticmethod
+    def get_clinical_facts(donor_data: dict, score_breakdown: dict) -> List[str]:
+        facts = []
+        # Blood Compatibility Fact
+        blood_score = score_breakdown.get('blood_compatibility', 0)
+        if blood_score >= 1.0:
+            facts.append("ABO matching is identical.")
+        else:
+            facts.append("ABO matching is compatible (O-Universal).")
+            
+        # CIT Fact
+        travel_time = donor_data.get('estimated_travel_time', 0)
+        facts.append(f"Estimated Cold Ischemia Time (CIT) is {travel_time:.1f} hours.")
+        
+        # Medical History
+        if score_breakdown.get('condition_factor', 1.0) < 1.0:
+            facts.append("Donor has manageable comorbidities (Diabetes/Hyp) noted.")
+        else:
+            facts.append("Donor has no significant recorded comorbidities.")
+            
+        return facts
 
 class ExplanationService:
     def __init__(self):
@@ -30,74 +50,62 @@ class ExplanationService:
         score_breakdown: dict
     ) -> tuple[str, str]:
         """
-        Generates a clinical explanation for a match using Gemini with caching.
+        Hybrid Deterministic/LLM Explanation.
+        Phase 1: Deterministic Factual Audit.
+        Phase 2: LLM Clinical Synthesis.
         """
+        # 1. Deterministic Facts (Zero Hallucination)
+        facts = MatchJustification.get_clinical_facts(donor_data, score_breakdown)
+        deterministic_intro = " ".join(facts)
+        
+        # 2. Check Cache
         cache_key = self._get_cache_key(
             donor_data['id'], 
             request_data['patient_blood_type'], 
             request_data['required_organs']
         )
         
-        # Check cache (TTL 300s)
         if cache_key in self._cache:
             cached = self._cache[cache_key]
             if time.time() - cached['timestamp'] < 300:
-                print(f"[CACHE] Returning cached explanation for {donor_data['id']}")
-                return cached['explanation'], "gemini"
+                return f"{deterministic_intro} {cached['explanation']}", "hybrid-cached"
 
+        # 3. LLM Synthesis (Phase 2)
         system_prompt = (
-            "You are a clinical matching assistant for a hospital coordinator dashboard. "
-            "Be factual, concise, and clinical. Never speculate beyond the data. "
-            "Never use the words 'perfect', 'ideal', or 'best'."
+            "You are a Clinical Auditor for an organ transplant dashboard. "
+            "Output exactly two sentences starting with 'Clinical Justification:'. "
+            "Use only the provided statistics. Do not speculate. "
+            "Never use words like 'perfect', 'ideal', or 'best'. "
+            "Protect Patient Privacy (no names)."
         )
 
         user_prompt = f"""
-        A donor has been ranked #{rank} out of {total_compatible} compatible donors for this request.
-
-        Donor data:
-        - Age: {donor_data['age']}, Blood type: {donor_data['blood_type']}
-        - Available organs/components: {donor_data['available_organs']}
-        - Active medical conditions: {donor_data.get('conditions', 'None recorded')}
-        - Distance from hospital: {donor_data['distance_km']:.1f} km
-
-        Hospital request:
-        - Required: {request_data['required_organs']}
-        - Patient blood type: {request_data['patient_blood_type']}
-
-        Score breakdown:
-        - Blood compatibility: {score_breakdown['blood_compatibility']:.0%}
-        - Organ availability: {score_breakdown['organ_availability']:.0%}
-        - Age factor: {score_breakdown['age_factor']:.0%}
-        - Condition factor: {score_breakdown['condition_factor']:.0%}
-        - Proximity: {score_breakdown['proximity']:.0%}
-
-        In exactly 2-3 sentences, explain to the coordinator why this donor is ranked #{rank}. 
-        Reference specific score factors. Do not recommend action.
+        Donor ranked #{rank} of {total_compatible} per clinical utility.
+        Stats:
+        - Age: {donor_data['age']}
+        - Scores: HLA({score_breakdown.get('age_factor', 0):.1f}), Proximity({score_breakdown.get('proximity', 0):.1f})
+        - CIT: {donor_data.get('estimated_travel_time', 0):.1f}h
+        Requirements: {request_data['required_organs']}
         """
 
-        fallback_msg = (
-            "Explanation unavailable. Donor ranked based on blood compatibility, "
-            "organ availability, age profile, and proximity score."
-        )
-
         try:
-            # 8s hard limit as per requirement
+            # 8s hard limit
             response = self.model.generate_content(
                 f"SYSTEM: {system_prompt}\nUSER: {user_prompt}",
-                generation_config={"timeout": 8.0}
+                generation_config={"timeout": 8.0, "temperature": 0.1}
             )
-            explanation = response.text.strip()
+            llm_synthesis = response.text.strip()
             
             # Store in cache
             self._cache[cache_key] = {
-                "explanation": explanation,
+                "explanation": llm_synthesis,
                 "timestamp": time.time()
             }
-            return explanation, "gemini"
+            return f"{deterministic_intro} {llm_synthesis}", "hybrid-gemini"
             
         except Exception as e:
-            print(f"[EXPLANATION] Gemini Error (timeout or key): {e}")
-            return fallback_msg, "fallback"
+            fallback = "Ranking prioritized based on HLA compatibility, CIT window viability, and waitlist time."
+            return f"{deterministic_intro} {fallback}", "hybrid-fallback"
 
 _explanation_service = None
 

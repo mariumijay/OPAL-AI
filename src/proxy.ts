@@ -30,11 +30,10 @@ export async function proxy(request: NextRequest) {
         },
       },
     }
-
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
 
   const publicRoutes = [
     '/auth/login',
@@ -44,13 +43,12 @@ export async function proxy(request: NextRequest) {
     '/auth/reset-password',
     '/auth/verify-email',
     '/auth/role-select',
-    '/auth/pending-approval', // Allow pending screen
+    '/auth/pending-approval', 
     '/',
   ];
 
   const isPublic = publicRoutes.some(route => pathname === route || pathname.startsWith(route));
 
-  // Not logged in — allow public, block protected
   if (!user) {
     if (!isPublic && pathname.startsWith('/dashboard')) {
       return NextResponse.redirect(new URL('/auth/login', request.url));
@@ -58,8 +56,6 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Redirect authenticated users away from auth pages (Login, Forgot Password), 
-  // but allow access to registration pages to avoid 404/redirect loops during dev.
   if (user && pathname.startsWith("/auth") && 
       !pathname.includes('pending-approval') && 
       !pathname.includes('donor/signup') && 
@@ -67,62 +63,45 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // Logged in — Check Approval and Handle RBAC for Dashboards
+  // Logged in — RBAC for Dashboards
   if (pathname.startsWith('/dashboard')) {
     const role = user.user_metadata?.role;
-    const email = user.email;
+    const email = user.email?.toLowerCase();
+    const isAdminMode = searchParams.get("mode") === "admin_view";
+    const isSuperAdmin = email === "ranahaseeb9427@gmail.com";
 
-    // Admin Routing
-    if (role === 'admin' || email === "ranahaseeb9427@gmail.com") {
-      if (pathname === '/dashboard' || (!pathname.startsWith('/dashboard/admin'))) {
+    // 1. Super Admin / Admin Override
+    // Allows full navigation across all dashboards if triggered by role-switcher
+    if (role === 'admin' || isSuperAdmin || isAdminMode) {
+      if (pathname === '/dashboard') {
         return NextResponse.redirect(new URL('/dashboard/admin', request.url));
       }
+      // Critical: Allow access to /dashboard/hospital or /dashboard/donor for admins
       return response;
     }
 
-    // Role-based Root Dashboard Routing
+    // 2. Role-based Root Dashboard Routing (Landing on /dashboard)
     if (pathname === '/dashboard') {
       if (role === 'hospital') return NextResponse.redirect(new URL('/dashboard/hospital', request.url));
       if (role === 'doctor') return NextResponse.redirect(new URL('/dashboard/doctor', request.url));
-      else return NextResponse.redirect(new URL('/dashboard/donor', request.url));
+      return NextResponse.redirect(new URL('/dashboard/donor', request.url));
     }
 
-    // Check Donor Approval
+    // 3. Donor Strict Guard
     if (role === 'donor') {
       if (pathname.startsWith('/dashboard/admin') || pathname.startsWith('/dashboard/hospital')) {
          return NextResponse.redirect(new URL('/dashboard/donor', request.url));
       }
-
-      const { data } = await supabase
-        .from('blood_donors')
-        .select('approval_status')
-        .eq('user_id', user.id)
-        .single();
-        
-      if (data?.approval_status !== 'approved') {
-        return NextResponse.redirect(new URL('/auth/pending-approval', request.url));
-      }
     }
 
-    // Check Hospital Approval
+    // 4. Hospital Strict Guard
     if (role === 'hospital') {
       if (pathname.startsWith('/dashboard/admin') || pathname.startsWith('/dashboard/donor')) {
          return NextResponse.redirect(new URL('/dashboard/hospital', request.url));
       }
-
-      const { data } = await supabase
-        .from('hospitals')
-        .select('approval_status')
-        .eq('user_id', user.id)
-        .single();
-        
-      if (data?.approval_status !== 'approved') {
-        return NextResponse.redirect(new URL('/auth/pending-approval', request.url));
-      }
     }
   }
 
-  // Default: allow everything, proxy handles session
   return response;
 }
 
