@@ -14,6 +14,7 @@ import {
   RefreshCcw
 } from "lucide-react";
 import { useOpalChat } from "@/hooks/useOpalChat";
+import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { API_BASE_URL } from "@/lib/config";
@@ -49,6 +50,7 @@ export function OpalChatWidget() {
   const [mounted, setMounted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { messages, sendMessage, isLoading, clearChat } = useOpalChat();
+  const pathname = usePathname();
   const supabase = createClient();
 
   useEffect(() => {
@@ -57,15 +59,30 @@ export function OpalChatWidget() {
   }, []);
 
   useEffect(() => {
-    async function getRole() {
+    async function updateRole() {
+      // 1. Path-based Role Detection (Dynamic Context)
+      if (pathname.includes('/dashboard/admin')) {
+        setRole('admin');
+        return;
+      }
+      if (pathname.includes('/dashboard/hospital')) {
+        setRole('hospital');
+        return;
+      }
+      if (pathname.includes('/dashboard/donor')) {
+        setRole('donor');
+        return;
+      }
+
+      // 2. Metadata Fallback
       const { data: { session } } = await supabase.auth.getSession();
       const userRole = session?.user?.user_metadata?.role;
       if (userRole === "admin" || userRole === "hospital" || userRole === "donor") {
         setRole(userRole);
       }
     }
-    getRole();
-  }, [supabase]);
+    if (mounted) updateRole();
+  }, [pathname, mounted, supabase]);
 
   useEffect(() => {
     if (scrollRef.current) {
