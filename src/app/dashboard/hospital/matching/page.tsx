@@ -393,10 +393,10 @@ export default function ProfessionalMatchingPage() {
                     exit={{ opacity: 0 }}
                     className="space-y-10"
                   >
-                    {/* Top Match Spotlight */}
+                    {/* Top Match Spotlight - HUMAN CENTRIC REBRAND */}
                     <div>
                         <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4 flex items-center gap-2">
-                          <HeartPulse className="h-3 w-3 text-red-500" /> Clinical Recommendation
+                          <HeartPulse className="h-3 w-3 text-red-500" /> Top Verified Donor Match
                         </h2>
                         <MatchCard 
                           match={matches[0]} 
@@ -406,10 +406,10 @@ export default function ProfessionalMatchingPage() {
                         />
                     </div>
 
-                    {/* Secondary List Section */}
+                    {/* Secondary List Section - HUMAN CENTRIC REBRAND */}
                     {matches.length > 1 && (
                       <div>
-                        <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">Secondary Clinical Candidates ({matches.length - 1})</h2>
+                        <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">Available Registered Donors ({matches.length - 1})</h2>
                         <div className="space-y-4">
                           {matches.slice(1).map((m) => (
                             <MatchCard 
