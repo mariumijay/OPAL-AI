@@ -124,6 +124,7 @@ export default function LoginPage() {
                 <input
                   {...register("email")}
                   placeholder="name@facility.pk"
+                  suppressHydrationWarning
                   className="w-full bg-muted/40 border-border rounded-xl py-3.5 pl-11 pr-4 focus:ring-2 focus:ring-primary/50 transition-all outline-none"
                 />
               </div>
@@ -133,7 +134,7 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="flex justify-between items-center ml-1">
                 <label className="text-sm font-bold">Password</label>
-                <Link href="/auth/forgot-password" **className**="text-xs text-primary font-bold hover:underline">Forgot?</Link>
+                <Link href="/auth/forgot-password" className="text-xs text-primary font-bold hover:underline">Forgot?</Link>
               </div>
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -141,6 +142,7 @@ export default function LoginPage() {
                   {...register("password")}
                   type="password"
                   placeholder="••••••••"
+                  suppressHydrationWarning
                   className="w-full bg-muted/40 border-border rounded-xl py-3.5 pl-11 pr-4 focus:ring-2 focus:ring-primary/50 transition-all outline-none"
                 />
               </div>
@@ -149,6 +151,7 @@ export default function LoginPage() {
 
             <button
               disabled={isLoading}
+              suppressHydrationWarning
               className="w-full py-4 bg-primary text-primary-foreground rounded-xl font-black uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
               {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>Sign In <LogIn className="w-4 h-4" /></>}
