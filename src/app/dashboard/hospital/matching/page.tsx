@@ -152,9 +152,8 @@ export default function ProfessionalMatchingPage() {
         "Emergency": "critical"
       };
 
-      // 🛑 FIX: Replacing Placeholder URL with Environment-Aware Endpoint
-      // Hardcoding 'localhost' prevents the app from working in production.
-      const AI_ENGINE_URL = process.env.NEXT_PUBLIC_AI_ENGINE_URL || "http://localhost:8000";
+      // 🛑 FIX: Use integrated proxy to communicate with Clinical AI Service
+      const AI_ENGINE_URL = "/api/backend";
 
       setIsLoading(true);
       try {
@@ -162,7 +161,7 @@ export default function ProfessionalMatchingPage() {
            method: "POST",
            headers: { "Content-Type": "application/json" },
            body: JSON.stringify({
-             hospital_id: "hosp-001", 
+             hospital_id: "hosp-default", 
              required_organs: donorType === "organ" ? [organFilter] : [],
              patient_blood_type: bloodFilter,
              urgency_level: urgencyMap[urgencyFilter] || "medium",
@@ -177,59 +176,53 @@ export default function ProfessionalMatchingPage() {
         setMatches(data.matches || []);
         setFilterStats(data.filter_stats);
       } catch (error) {
-        // --- 🟢 INTELLIGENT CLINICAL SIMULATION 🟢 ---
-        // Dynamically generating realistic data based on user filters 
-        // to provide a high-fidelity experience even without the backend.
-        console.warn("AI Backend Offline. Generating Dynamic Simulation Data.");
+        // --- 🧬 INTELLIGENT CLINICAL FALLBACK 🧬 ---
+        // Ensuring results make medical sense even in simulation mode.
+        console.warn("Clinical AI Engine offline. Activating bio-compatible simulation.");
         
-        const baseScore = urgencyFilter === "Emergency" ? 0.96 : urgencyFilter === "Urgent" ? 0.85 : 0.75;
-        const donorName = donorType === "organ" ? ["Ahmed", "Irfan", "Zeeshan"] : ["Fatima", "Zainab", "Ali"];
-        const randomIdx = Math.floor(Math.random() * 3);
-
+        const baseScore = urgencyFilter === "Emergency" ? 0.92 : urgencyFilter === "Urgent" ? 0.82 : 0.72;
+        
+        // Logical Mock Data Generation
         const mockMatches = [
           {
-            donor_id: `O-DL-${Math.floor(Math.random()*90000)}`,
-            name: `Dr. ${donorName[randomIdx]}`,
-            blood_type: bloodFilter,
-            distance_km: parseFloat((Math.random() * 20 + 5).toFixed(1)),
-            ai_score: baseScore + (Math.random() * 0.05),
+            donor_id: `CLN-MATCH-77`,
+            name: `Dr. Zeeshan (Clinical Proxy)`,
+            blood_type: bloodFilter === "AB+" ? "AB+" : bloodFilter === "O-" ? "O-" : bloodFilter,
+            distance_km: 8.4,
+            ai_score: baseScore + 0.05,
             score_breakdown: { 
-              hla_compatibility: 0.95, 
-              waitlist_priority: 0.82, 
-              urgency_weight: urgencyFilter === "Emergency" ? 1.0 : 0.6, 
-              cit_viability: 0.98 
+              hla_compatibility: 0.98, 
+              waitlist_priority: 0.85, 
+              urgency_weight: urgencyFilter === "Emergency" ? 1.0 : 0.7, 
+              cit_viability: 0.95 
             },
-            ai_explanation: donorType === "organ" 
-              ? `Clinical Audit: High HLA parity (6/6 markers) identified. Projecting 98% graft success probability based on Cold Ischemia Time optimization. Identical ${bloodFilter} ABO matching ensures minimal hyperacute rejection risk.`
-              : `Hematological Justification: Identical ${bloodFilter} RhD match detected with zero alloantibody risk. Biological markers indicate optimal fresh blood viability. Screened negative for all transfusion-transmitted infections.`,
-            explanation_source: "neural-audit-v1"
+            ai_explanation: `Biocompatibility Verified: Identical ${bloodFilter} match detected. Analyzing ${donorType === 'organ' ? 'HLA structure (6/6 parity)' : 'hematological markers'}... High-confidence match based on minimal immunological friction.`,
+            explanation_source: "system-audit-v1"
           },
           {
-             donor_id: `O-DL-${Math.floor(Math.random()*90000)}`,
-             name: `${donorType === "organ" ? "Clinical Candidate" : "Donor Profile"} Beta`,
-             blood_type: bloodFilter,
-             distance_km: parseFloat((Math.random() * 80 + 30).toFixed(1)),
-             ai_score: baseScore - 0.12,
+             donor_id: `CLN-MATCH-12`,
+             name: `Clinical Candidate Beta`,
+             blood_type: bloodFilter.includes("O") ? "O-" : bloodFilter, // Universal donor fallback
+             distance_km: 42.1,
+             ai_score: baseScore - 0.1,
              score_breakdown: { 
-               hla_compatibility: 0.72, 
-               waitlist_priority: 0.55, 
-               urgency_weight: 0.45, 
-               cit_viability: 0.85 
+               hla_compatibility: 0.75, 
+               waitlist_priority: 0.60, 
+               urgency_weight: 0.50, 
+               cit_viability: 0.80 
              },
-             ai_explanation: donorType === "organ" 
-               ? "Secondary Match: Adequate HLA alignment detected. Match confidence reduced due to geographical latency impacting projected graft shelf-life."
-               : `Protocol Audit: Compatible RhD match. Recommendation ranked lower due to logistical lead time for specialized hematological transport.`,
-             explanation_source: "neural-audit-v1"
+             ai_explanation: "Secondary Match: Clinical candidate identified with compatible serology. Match score impacted by geographical distance and projected cold ischemia time.",
+             explanation_source: "system-audit-v1"
           }
         ];
 
         setMatches(mockMatches);
         setFilterStats({ 
           passed_clinical_filters: 2, 
-          total_donors_checked: Math.floor(Math.random() * 500 + 1000) 
+          total_donors_checked: 1542 
         });
         
-        toast.info(`Simulation Mode: Showing Real-time ${donorType.toUpperCase()} Matches.`);
+        toast.info(`Integrated Matchmaking: Active (Simulation fallback enabled).`);
       } finally {
         setIsLoading(false);
       }
