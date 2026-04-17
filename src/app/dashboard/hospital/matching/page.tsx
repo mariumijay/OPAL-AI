@@ -74,12 +74,13 @@ const MatchCard = ({ match, isTopMatch = false, onProcure }: { match: any, isTop
           </div>
         </div>
 
-        {/* Top 4 Critical Metrics - Grid Layout */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 border-y border-slate-50">
-          <MetricBadge label="ABO Compatibility" value={match.blood_type} icon={Droplets} />
-          <MetricBadge label="Transport Time" value={`${match.distance_km?.toFixed(1)} km (~${Math.round(match.distance_km / 60)}h)`} icon={Clock} />
-          <MetricBadge label="HLA Match" value={match.score_breakdown?.hla_compatibility > 0.8 ? "High (6/6)" : "Adequate"} icon={ShieldCheck} />
-          <MetricBadge label="Urgency Alignment" value={match.score_breakdown?.urgency_weight > 0.8 ? "Critical" : "Routine"} icon={AlertCircle} />
+        {/* Top 5 Critical Metrics - Clinical Detail Integrated */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 py-4 border-y border-slate-50">
+          <MetricBadge label="Matched Organ" value={match.organ_type || "Kidney"} icon={Activity} />
+          <MetricBadge label="ABO Alignment" value={match.blood_type} icon={Droplets} />
+          <MetricBadge label="Road Time (~ETT)" value={match.travel_time_human || `${Math.round(match.distance_km/60)}h`} icon={Clock} />
+          <MetricBadge label="True Distance" value={`${match.distance_km?.toFixed(1) || '—'} km`} icon={MapPin} />
+          <MetricBadge label="HLA Compatibility" value={match.score_breakdown?.hla_compatibility > 0.8 ? "High (6/6)" : "Adequate"} icon={ShieldCheck} />
         </div>
 
         <div className="mt-4 flex items-center justify-between">
