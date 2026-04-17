@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase";
 import { mapBloodDonor, mapOrganDonor, mapHospital } from "@/lib/mappers";
 import type { Donor, Hospital, BloodDonorRow, OrganDonorRow, HospitalRow } from "@/lib/types";
@@ -291,7 +291,7 @@ export const useRecipients = useMatchResults;
 
 /** Broadcasts a new clinical request to the network */
 export function useCreateRequest() {
-  const queryClient = useQuery({ queryKey: ['qc'] }); // Simplified access or just use queryKey invalidation
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (formData: any) => {
