@@ -36,7 +36,7 @@ const COLORS = {
 
 // --- Sub-components ---
 
-const MetricBadge = ({ label, value, icon: Icon }: { label: string; value: string; icon: any }) => (
+const MetricBadge = ({ label, value, icon: Icon, color = "text-slate-700" }: { label: string; value: string; icon: any, color?: string }) => (
   <div className="flex flex-col gap-1">
     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight flex items-center gap-1">
       <Icon className="h-2.5 w-2.5" /> {label}
