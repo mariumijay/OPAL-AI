@@ -259,8 +259,8 @@ export function useCityDonorStats() {
   });
 }
 
-/** Fetches active clinical requests/recipients */
-export function useRecipients() {
+/** Fetches active clinical requests/recipients (Matching Feed) */
+export function useMatchResults() {
   return useQuery({
     queryKey: ["recipients"],
     queryFn: async () => {
@@ -286,6 +286,9 @@ export function useRecipients() {
     },
   });
 }
+
+// Alias for backward compatibility if needed in other views
+export const useRecipients = useMatchResults;
 
 /** Broadcasts a new clinical request to the network */
 export function useCreateRequest() {

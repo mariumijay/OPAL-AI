@@ -10,7 +10,8 @@ import { ConfidenceMeter } from "@/components/shared/ConfidenceMeter";
 import { BloodCompatBadge } from "@/components/shared/BloodCompatBadge";
 import { SkeletonStats, SkeletonTable } from "@/components/shared/Skeleton";
 import { useMatchResults, useAllDonors, useRecipients, useRealtimeMatchResults, useHospitals } from "@/hooks/useSupabaseData";
-import NetworkMap from "@/components/dashboard/hospital/NetworkMap";
+import dynamic from "next/dynamic";
+const NetworkMap = dynamic(() => import("@/components/dashboard/hospital/NetworkMap"), { ssr: false });
 import { mockMatches } from "@/data/mock";
 import { safeField } from "@/lib/mappers";
 import { timeAgo } from "@/lib/utils";
@@ -151,7 +152,11 @@ export default function HospitalDashboard() {
   const { data: allDonors, isLoading: donorLoading } = useAllDonors();
   const { data: allHospitals } = useHospitals();
   const { data: recipients } = useRecipients();
-  const realtimeMatches = useRealtimeMatchResults();
+  const [realtimeMatches, setRealtimeMatches] = useState<any[]>([]);
+  useRealtimeMatchResults((match) => {
+    setRealtimeMatches(prev => [match, ...prev.slice(0, 9)]);
+    toast.info("New medical request broadcast detected in network!");
+  });
 
   const isLoading = matchLoading || donorLoading;
 

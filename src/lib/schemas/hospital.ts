@@ -28,3 +28,15 @@ export const hospitalFormSchema = z.object({
 });
 
 export type HospitalRegistrationValues = z.infer<typeof hospitalFormSchema>;
+
+// --- [HOSPITAL LOGISTICS SCHEMAS] ---
+
+export const DonorRequestSchema = z.object({
+  request_type: z.enum(["Blood", "Plasma", "Organ"]),
+  blood_type: z.string().min(1, "Blood type is required"),
+  organ_needed: z.string().optional(),
+  urgency_level: z.enum(["Routine", "Urgent", "Emergency"]),
+  search_radius_km: z.number().min(5).max(100),
+});
+
+export type DonorRequestValues = z.infer<typeof DonorRequestSchema>;
