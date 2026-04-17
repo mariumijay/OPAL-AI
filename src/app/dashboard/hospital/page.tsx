@@ -244,23 +244,64 @@ export default function HospitalDashboard() {
 
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* LEFT COLUMN: Request Core */}
+        {/* LEFT COLUMN: Command Shortcuts (REPLACING REDUNDANT FORM) */}
         <div className="lg:col-span-6 space-y-8">
-           <RequestForm />
-           {/* Compliance Mini-Card (Quick View) */}
-           <div className="glass-card rounded-[2.5rem] p-8 border border-border flex items-center justify-between bg-gradient-to-r from-success/5 to-transparent">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Link href="/dashboard/hospital/matching" className="group relative bg-primary rounded-[2.5rem] p-8 overflow-hidden shadow-2xl hover:scale-[1.02] transition-all">
+                <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+                   <Cpu className="h-24 w-24 text-white" />
+                </div>
+                <h3 className="text-2xl font-black text-white font-display mb-2">Launch AI Matchmaker</h3>
+                <p className="text-xs text-white/70 font-bold uppercase tracking-widest">Execute Neural Search Interface</p>
+                <div className="mt-8 flex items-center gap-2 text-white font-black text-[10px] uppercase tracking-[0.2em]">
+                   Start Discovery <ArrowRight className="h-3 w-3" />
+                </div>
+              </Link>
+
+              <div className="grid grid-rows-2 gap-4">
+                 <Link href="/dashboard/hospital/map" className="bg-card border border-border rounded-[2rem] p-6 hover:bg-muted/50 transition-all group">
+                    <div className="flex items-center gap-4">
+                       <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:rotate-12 transition-transform">
+                          <Map className="h-5 w-5" />
+                       </div>
+                       <div>
+                          <h4 className="font-black text-foreground uppercase tracking-tight text-sm">Live Network Map</h4>
+                          <p className="text-[10px] text-muted-foreground font-bold uppercase">Geospatial Intelligence</p>
+                       </div>
+                    </div>
+                 </Link>
+                 <button 
+                   onClick={handleDownloadAuditReport}
+                   className="bg-card border border-border rounded-[2rem] p-6 hover:bg-muted/50 transition-all group text-left"
+                 >
+                    <div className="flex items-center gap-4">
+                       <div className="h-10 w-10 rounded-xl bg-success/10 flex items-center justify-center text-success group-hover:rotate-12 transition-transform">
+                          <ShieldCheck className="h-5 w-5" />
+                       </div>
+                       <div>
+                          <h4 className="font-black text-foreground uppercase tracking-tight text-sm">Download Compliance</h4>
+                          <p className="text-[10px] text-muted-foreground font-bold uppercase">Generate Audit Report</p>
+                       </div>
+                    </div>
+                 </button>
+              </div>
+           </div>
+
+           {/* Clinical Diagnostic Health (Enhanced UI) */}
+           <div className="glass-card rounded-[2.5rem] p-8 border border-border flex items-center justify-between bg-gradient-to-r from-success/5 to-transparent relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-success/10 blur-[60px] rounded-full translate-x-1/2 -translate-y-1/2" />
               <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-success/10 flex items-center justify-center text-success">
-                      <ShieldCheck className="h-6 w-6" />
+                  <div className="h-14 w-14 rounded-2xl bg-success/10 flex items-center justify-center text-success shadow-inner border border-success/20">
+                      <ShieldCheck className="h-7 w-7" />
                   </div>
                   <div>
-                      <h3 className="text-xl font-bold font-display tracking-tight">System Integrity</h3>
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Verified Medical Facility</p>
+                      <h3 className="text-2xl font-black font-display tracking-tight text-foreground">Operational Integrity</h3>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mt-0.5">Verified Medical Node #PK-772</p>
                   </div>
               </div>
               <div className="text-right">
-                  <span className="text-2xl font-black text-foreground">99.2</span>
-                  <span className="text-[10px] font-black text-muted-foreground uppercase ml-1">/100</span>
+                  <span className="text-3xl font-black text-foreground tracking-tighter">99.2</span>
+                  <span className="text-[10px] font-black text-muted-foreground uppercase ml-1 tracking-widest">/100</span>
               </div>
            </div>
         </div>
