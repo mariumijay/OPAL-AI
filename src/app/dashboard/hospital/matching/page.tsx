@@ -15,7 +15,8 @@ import {
   Droplets,
   HeartPulse,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Zap
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BLOOD_TYPES, ORGAN_TYPES, URGENCY_LEVELS } from "@/lib/constants";
