@@ -405,18 +405,41 @@ export default function HospitalDashboard() {
         </div>
       </div>
 
-      {/* SECTION 4: Geospatial Network Map - Full Width for Impact */}
-      <div className="space-y-6">
-          <div className="flex items-center justify-between px-2">
-              <div>
-                  <h2 className="text-2xl font-black font-display tracking-tight uppercase">Global Intelligence Map</h2>
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">Real-time Visualization of the Donor Network</p>
+      {/* SECTION 4: Geospatial Network Surveillance - Full Width for Impact */}
+      <div className="space-y-8 mt-12">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-4">
+              <div className="flex items-center gap-5">
+                  <div className="h-16 w-16 rounded-[2rem] bg-success/10 flex items-center justify-center text-success border border-success/20 shadow-lg shadow-success/10 transition-transform hover:rotate-6">
+                      <Map className="h-8 w-8" />
+                  </div>
+                  <div>
+                      <h2 className="text-3xl font-black font-display tracking-tight uppercase text-foreground leading-none">National Clinical Surveillance</h2>
+                      <div className="flex items-center gap-2 mt-2">
+                         <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
+                         <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Live Regional Geospatial Intelligence</p>
+                      </div>
+                  </div>
               </div>
-              <div className="px-4 py-1.5 rounded-full bg-success/10 text-success text-[10px] font-black uppercase tracking-widest border border-success/20">
-                  {allDonors?.length || 0} Nodes Active
+              <div className="flex items-center gap-3">
+                  <div className="px-6 py-3 rounded-2xl bg-card border border-border shadow-xl flex flex-col items-center">
+                      <span className="text-xs font-black text-success uppercase leading-none">{allDonors?.length || 0}</span>
+                      <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mt-1">Donors</span>
+                  </div>
+                  <div className="px-6 py-3 rounded-2xl bg-card border border-border shadow-xl flex flex-col items-center">
+                      <span className="text-xs font-black text-primary uppercase leading-none">{allHospitals?.length || 0}</span>
+                      <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mt-1">Hospitals</span>
+                  </div>
               </div>
           </div>
-          <div className="rounded-[3rem] overflow-hidden border border-border shadow-2xl">
+
+          <div className="relative rounded-[3.5rem] overflow-hidden border-8 border-card shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] bg-slate-900 group">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none z-10" />
+              <div className="absolute top-8 left-8 z-20 pointer-events-none">
+                 <div className="glass-card px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3 backdrop-blur-3xl">
+                    <div className="h-1.5 w-1.5 rounded-full bg-success animate-ping" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Scanning Active: Pakistan Hub</span>
+                 </div>
+              </div>
               <NetworkMap 
                 donors={allDonors || []} 
                 hospitals={allHospitals || []}
