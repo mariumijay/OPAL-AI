@@ -160,8 +160,8 @@ export default function DonorMap() {
 
   const sourceHospitals = (liveHospitals?.length ? liveHospitals : mockHospitals);
   const hospitalMarkers = sourceHospitals.map((h: any) => ({ 
-      id: h.id || h.hospital_id, 
-      name: h.hospital_name, 
+      id: h.id, 
+      name: h.name, 
       city: h.city, 
       lat: h.latitude || 30.3753, 
       lng: h.longitude || 69.3451 

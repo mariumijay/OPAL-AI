@@ -9,75 +9,81 @@ export async function POST(request: Request) {
   const adminClient = getServiceSupabase();
 
   try {
+    // 1. Authorization Audit
     const { data: { user } } = await supabase.auth.getUser();
-    
     const isAdmin = user?.user_metadata?.role === "admin" || user?.email === "ranahaseeb9427@gmail.com";
     
     if (!isAdmin) {
-      return NextResponse.json({ error: "Unauthorized: Admin access required" }, { status: 403 });
+      return NextResponse.json({ error: "Unauthorized: Administrator credentials required." }, { status: 403 });
     }
 
-    const { user_id, user_type, email, name } = await request.json();
+    const { user_id, user_type, email } = await request.json();
 
     if (!user_id || !user_type) {
-      return NextResponse.json({ error: "User ID and Type are required" }, { status: 400 });
+      return NextResponse.json({ error: "Missing Target Identity: user_id and user_type required." }, { status: 400 });
     }
 
-    // 1. Determine target table
+    // 2. Transactional Update Strategy
+    // Phase A: Update Specialized Tables
     const table = user_type === 'hospital' 
       ? 'hospitals' 
       : (user_type === 'blood_donor' ? 'blood_donors' : 'organ_donors');
     
-    const idKey = user_type === 'hospital' ? 'id' : 'donor_id';
-
-    // 2. Update status in Database
     const updatePayload: any = { 
       approval_status: 'approved',
-      approved_at: new Date().toISOString()
     };
     
-    // Only hospitals use the legacy 'is_verified' boolean
     if (user_type === 'hospital') {
       updatePayload.is_verified = true;
     }
 
-    const { error: updateError } = await adminClient
+    const { error: tableError } = await adminClient
       .from(table)
       .update(updatePayload)
       .eq('user_id', user_id); 
 
-    if (updateError) throw updateError;
+    if (tableError) throw new Error(`Specialized Table Update Failed: ${tableError.message}`);
 
-    // 2.5 ALSO Update the central 'donors' table if it's a donor
-    if (user_type.includes('donor')) {
-      await adminClient
-        .from('donors')
-        .update({ status: 'active' })
-        .eq('user_id', user_id);
-    }
+    // Phase B: Update Profile Role (Sync with Auth logic)
+    const newRole = user_type === 'hospital' ? 'hospital' : 'donor';
+    const { error: profileError } = await adminClient
+      .from('profiles')
+      .update({ role: newRole })
+      .eq('id', user_id);
 
-    // 2.6 Update Supabase Auth user metadata so their session knows they're verified
-    await adminClient.auth.admin.updateUserById(user_id, {
+    if (profileError) throw new Error(`Profile Role Sync Failed: ${profileError.message}`);
+
+    // Phase C: Update Auth User Metadata (For session persistence)
+    const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(user_id, {
       user_metadata: {
+        role: newRole,
         is_verified: true,
         approval_status: 'approved',
       }
     });
 
-    // 3. Send Success Email
+    if (authUpdateError) throw new Error(`Auth Metadata Sync Failed: ${authUpdateError.message}`);
+
+    // 3. Optional Notification Dispatch
     try {
-      await sendApprovalEmail(email, user_type.replace('_', ' '));
+      if (email) {
+        await sendApprovalEmail(email, user_type.replace('_', ' '));
+      }
     } catch (emailError) {
-      console.error("User approved but email failed:", emailError);
+      console.error("Critical: User approved but notification failed.", emailError);
       return NextResponse.json({ 
         success: true, 
-        warning: "User approved in DB but notification email failed." 
+        warning: "System updated successfully, but notification email was blocked." 
       });
     }
 
-    return NextResponse.json({ success: true, message: `${user_type} approved successfully.` });
+    return NextResponse.json({ 
+      success: true, 
+      message: `${user_type.toUpperCase()} verified and role permissions updated.` 
+    });
+
   } catch (error: any) {
-    console.error("ADMIN APPROVAL ERROR:", error);
+    console.error("ADMIN CLINICAL APPROVAL FAILURE:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -4,6 +4,11 @@ import { ThemeProvider } from "@/providers/ThemeProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ToasterProvider } from "@/providers/ToasterProvider";
 import "./globals.css";
+import { validateEnv } from "@/lib/env";
+
+import { OpalChatWidget } from "@/components/chat/OpalChatWidget";
+
+validateEnv();
 
 const inter = Inter({
   variable: "--font-body",
@@ -37,6 +42,7 @@ export default function RootLayout({
         <ThemeProvider>
           <QueryProvider>
             {children}
+            <OpalChatWidget />
             <ToasterProvider />
           </QueryProvider>
         </ThemeProvider>

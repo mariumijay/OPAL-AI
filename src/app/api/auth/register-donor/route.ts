@@ -10,27 +10,20 @@ export async function POST(request: NextRequest) {
     // 1. Validation
     const result = donorFormSchema.safeParse(body);
     if (!result.success) {
-      return NextResponse.json({ success: false, error: "Validation failed", details: result.error.flatten().fieldErrors }, { status: 400 });
+      return NextResponse.json({ 
+        success: false, 
+        error: "Validation failed", 
+        details: result.error.flatten().fieldErrors 
+      }, { status: 400 });
     }
 
     const data = result.data;
     const adminSupabase = getServiceSupabase();
     
-    // 2. Strict Check for Duplicate Email
+    // 2. Security Check: Duplicate Email
     const { data: existingUsersData } = await adminSupabase.auth.admin.listUsers();
     if (existingUsersData?.users.some(u => u.email === data.email)) {
       return NextResponse.json({ success: false, error: "An account already exists with this email address." }, { status: 409 });
-    }
-
-    // 3. Strict Check for Duplicate CNIC
-    const { data: existingCNIC } = await adminSupabase
-      .from('donors')
-      .select('id')
-      .eq('cnic', data.cnic)
-      .maybeSingle();
-
-    if (existingCNIC) {
-      return NextResponse.json({ success: false, error: "This CNIC is already registered in our network." }, { status: 409 });
     }
 
     // 3. Create Auth User
@@ -47,80 +40,89 @@ export async function POST(request: NextRequest) {
 
     if (authError) throw authError;
     const userId = authData.user?.id;
-    if (!userId) throw new Error("Auth failed: No ID generated");
+    if (!userId) throw new Error("Auth storage failed: User ID not generated");
 
-    // 4. Insert into Central Donors table
-    const birthDate = new Date(new Date().getFullYear() - (data.age || 20), 0, 1).toISOString().split('T')[0];
-    
-    const { error: dbError } = await adminSupabase.from('donors').insert([{
-      user_id: userId,
-      first_name: data.firstName,
-      last_name: data.lastName,
-      birth_date: birthDate,
-      city: data.city,
-      blood_type: data.bloodType,
-      contact_number: data.contactNumber,
-      cnic: data.cnic,
-      gender: data.gender,
-      is_blood_donor: data.donationType === "Blood Donation Only" || data.donationType === "Both",
-      is_organ_donor: data.donationType === "Organ Donation Only" || data.donationType === "Both",
-      status: 'pending'
+    // 4. Create Profile (The Source of Truth for Roles)
+    const { error: profileError } = await adminSupabase.from('profiles').insert([{
+      id: userId,
+      email: data.email,
+      role: 'donor',
+      full_name: `${data.firstName} ${data.lastName}`
     }]);
 
-    if (dbError) throw dbError;
+    if (profileError) throw profileError;
 
-    // 5. Insert into specialized tables
+    // 5. Targeted Data Entry (No Ghost Tables)
+    const fullName = `${data.firstName} ${data.lastName}`;
+    
+    // Blood Branch
     if (data.donationType === "Blood Donation Only" || data.donationType === "Both") {
-       await adminSupabase.from('blood_donors').insert([{
+       const { error: bError } = await adminSupabase.from('blood_donors').insert([{
         user_id: userId,
-        full_name: `${data.firstName} ${data.lastName}`,
+        full_name: fullName,
         email: data.email,
         phone: data.contactNumber,
         age: data.age,
+        gender: data.gender,
         blood_type: data.bloodType,
+        cnic: data.cnic,
         hepatitis_status: data.hepStatus,
+        medical_conditions: data.medicalConditions,
         city: data.city,
-        is_available: false,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        is_available: true,
         approval_status: 'pending'
       }]);
+      if (bError) throw bError;
     }
 
+    // Organ Branch
     if (data.donationType === "Organ Donation Only" || data.donationType === "Both") {
-       await adminSupabase.from('organ_donors').insert([{
+       const { error: oError } = await adminSupabase.from('organ_donors').insert([{
         user_id: userId,
-        full_name: `${data.firstName} ${data.lastName}`,
+        full_name: fullName,
         email: data.email,
         phone: data.contactNumber,
         age: data.age,
+        gender: data.gender,
         blood_type: data.bloodType,
+        cnic: data.cnic,
         organs_available: data.organsWilling || [],
-        hiv_status: data.hivStatus || "Negative",
+        hiv_status: data.hivStatus,
         hepatitis_status: data.hepStatus,
+        diabetes: data.diabetes === "Yes",
+        smoker: data.smoker === "Yes",
+        height_cm: data.height,
+        weight_kg: data.weight,
         is_living_donor: data.donorStatus === "Living",
         next_of_kin_name: data.nextOfKinName,
         next_of_kin_contact: data.nextOfKinContact,
         consent_given: !!data.consent,
         city: data.city,
-        is_available: false,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        is_available: true,
         approval_status: 'pending'
       }]);
+      if (oError) throw oError;
     }
 
-    // 6. Send Welcome Email (Awaited for reliability)
+    // 6. Communication logic
     try {
-      await sendDonorWelcomeEmail(data.email, `${data.firstName} ${data.lastName}`, data.bloodType);
+      await sendDonorWelcomeEmail(data.email, fullName, data.bloodType);
     } catch (e) {
-      console.error("Welcome Email Sending Failed:", e);
+      console.error("Delayed Notification Warning: Welcome email could not be sent.", e);
     }
 
     return NextResponse.json({ 
       success: true, 
-      message: "Donor account created. Pending administrative approval.",
+      message: "Donor account established. Your application is now in the verification queue.",
       redirect: "/auth/pending-approval"
     }, { status: 201 });
 
   } catch (error: any) {
-    console.error("DONOR REGISTRATION ERROR:", error);
+    console.error("CRITICAL REGISTRATION FAILURE:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

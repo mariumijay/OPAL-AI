@@ -51,7 +51,7 @@ export default function HospitalDashboard() {
       // Fetch hospital data
       const { data: hospital } = await supabase
         .from("hospitals")
-        .select("hospital_name, city, license_number, hospital_type, admin_name, created_at, is_verified")
+        .select("name, city, license_number, hospital_type, admin_name, created_at, is_verified")
         .eq("user_id", user?.id)
         .single();
 
@@ -70,7 +70,7 @@ export default function HospitalDashboard() {
       let csv = `OPAL-AI — HOSPITAL COMPLIANCE & AUDIT REPORT\r\n`;
       csv += `Generated: ${reportDate}\r\n`;
       csv += `\r\n=== HOSPITAL PROFILE ===\r\n`;
-      csv += `Hospital Name,${hospital?.hospital_name || 'N/A'}\r\n`;
+      csv += `Hospital Name,${hospital?.name || 'N/A'}\r\n`;
       csv += `City,${hospital?.city || 'N/A'}\r\n`;
       csv += `License Number,${hospital?.license_number || 'N/A'}\r\n`;
       csv += `Type,${hospital?.hospital_type || 'N/A'}\r\n`;
@@ -254,20 +254,6 @@ export default function HospitalDashboard() {
         </div>
       )}
 
-      {/* NEW SECTION: Geospatial Network Map */}
-      <div className="space-y-6">
-          <div className="flex items-center justify-between">
-              <div>
-                  <h2 className="text-xl font-black font-display tracking-tight">Geospatial Matching Network</h2>
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">Live Vectors from {allMatches.length} matching nodes</p>
-              </div>
-          </div>
-          <NetworkMap 
-            donors={allDonors || []} 
-            hospitals={allHospitals || []}
-            matches={allMatches}
-          />
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* LEFT COLUMN: Request Core */}

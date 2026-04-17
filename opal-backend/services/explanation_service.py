@@ -1,43 +1,48 @@
 import hashlib
-import json
 import time
-from typing import Optional, Dict, List, Tuple
-import google.generativeai as genai
-from core.config import settings
+import logging
+from typing import Dict, List, Tuple, Any
+import asyncio
+from services.ai_service import get_ai_service
+
+# Setup logging for audit trail
+logger = logging.getLogger(__name__)
 
 class MatchJustification:
     """
     Deterministic factual verification to prevent LLM hallucinations.
+    Uses clinical data to provide a baseline for the AI.
     """
     @staticmethod
-    def get_clinical_facts(donor_data: dict, score_breakdown: dict) -> List[str]:
+    def get_clinical_facts(donor_data: Dict[str, Any], score_breakdown: Dict[str, Any]) -> List[str]:
         facts = []
         # Blood Compatibility Fact
-        blood_score = score_breakdown.get('blood_compatibility', 0)
+        blood_score = score_breakdown.get('blood_compatibility', 1.0) # Default to compatible
         if blood_score >= 1.0:
             facts.append("ABO matching is identical.")
         else:
-            facts.append("ABO matching is compatible (O-Universal).")
+            facts.append("ABO matching is compatible (Universal type logic applied).")
             
-        # CIT Fact
-        travel_time = donor_data.get('estimated_travel_time', 0)
-        facts.append(f"Estimated Cold Ischemia Time (CIT) is {travel_time:.1f} hours.")
+        # Distance/Travel Fact
+        distance = donor_data.get('distance_km', 0)
+        facts.append(f"Donor is located {distance:.1f}km from your facility.")
         
-        # Medical History
+        # Medical History Highlights
         if score_breakdown.get('condition_factor', 1.0) < 1.0:
-            facts.append("Donor has manageable comorbidities (Diabetes/Hyp) noted.")
+            facts.append("Clinical history suggests manageable comorbidities.")
         else:
-            facts.append("Donor has no significant recorded comorbidities.")
+            facts.append("Donor record indicates no significant comorbidities.")
             
         return facts
 
 class ExplanationService:
     def __init__(self):
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.ai_service = get_ai_service()
         self._cache: Dict[str, Dict] = {}
+        self.MAX_CACHE_SIZE = 1000 # Memory safety limit
         
-    def _get_cache_key(self, donor_id: str, patient_blood_type: str, required_organs: list[str]) -> str:
+    @staticmethod
+    def _get_cache_key(donor_id: str, patient_blood_type: str, required_organs: list) -> str:
         raw = f"{donor_id}:{patient_blood_type}:{sorted(required_organs)}"
         return hashlib.sha256(raw.encode()).hexdigest()
 
@@ -45,66 +50,98 @@ class ExplanationService:
         self,
         rank: int,
         total_compatible: int,
-        donor_data: dict,
-        request_data: dict,
-        score_breakdown: dict
-    ) -> tuple[str, str]:
+        donor_data: Dict[str, Any],
+        request_data: Dict[str, Any],
+        score_breakdown: Dict[str, Any]
+    ) -> Tuple[str, str]:
         """
         Hybrid Deterministic/LLM Explanation.
-        Phase 1: Deterministic Factual Audit.
-        Phase 2: LLM Clinical Synthesis.
+        Phase 1: Deterministic Factual Audit (Safe).
+        Phase 2: LLM Clinical Synthesis (Gemini).
         """
-        # 1. Deterministic Facts (Zero Hallucination)
+        # 1. Deterministic Baseline (Safe from Hallucinations)
         facts = MatchJustification.get_clinical_facts(donor_data, score_breakdown)
         deterministic_intro = " ".join(facts)
         
-        # 2. Check Cache
+        # 2. Check Cache for identical match request
         cache_key = self._get_cache_key(
-            donor_data['id'], 
-            request_data['patient_blood_type'], 
-            request_data['required_organs']
+            donor_data.get('id', 'unknown'), 
+            request_data.get('patient_blood_type', 'O+'), 
+            request_data.get('required_organs', [])
         )
         
         if cache_key in self._cache:
             cached = self._cache[cache_key]
-            if time.time() - cached['timestamp'] < 300:
+            if time.time() - cached['timestamp'] < 900: # 15 min cache
                 return f"{deterministic_intro} {cached['explanation']}", "hybrid-cached"
 
         # 3. LLM Synthesis (Phase 2)
         system_prompt = (
-            "You are a Clinical Auditor for an organ transplant dashboard. "
-            "Output exactly two sentences starting with 'Clinical Justification:'. "
-            "Use only the provided statistics. Do not speculate. "
-            "Never use words like 'perfect', 'ideal', or 'best'. "
-            "Protect Patient Privacy (no names)."
+            "You are a Clinical Matching Auditor. "
+            "Task: Synthesize a concise explanation for why this donor is a top match. "
+            "Constraints: Exactly two professional sentences. Start with 'Clinical Justification:'. "
+            "Strictly use provided stats. NO SPARKLES or flowery language. "
+            "Prioritize patient safety and blood compatibility."
         )
 
+        model = self.ai_service.get_model(system_instruction=system_prompt)
+        if not model:
+            return f"{deterministic_intro} Ranking prioritized by clinical utility and proximity score.", "hybrid-no-ai"
+
         user_prompt = f"""
-        Donor ranked #{rank} of {total_compatible} per clinical utility.
-        Stats:
-        - Age: {donor_data['age']}
-        - Scores: HLA({score_breakdown.get('age_factor', 0):.1f}), Proximity({score_breakdown.get('proximity', 0):.1f})
-        - CIT: {donor_data.get('estimated_travel_time', 0):.1f}h
-        Requirements: {request_data['required_organs']}
+        Rank: #{rank} of {total_compatible} compatible candidates.
+        Donor Stats: Age {donor_data.get('age')}, Blood {donor_data.get('blood_type')}.
+        Clinical Scores: HLA Weight({score_breakdown.get('hla_compatibility', 0):.2f}), Proximity({score_breakdown.get('cit_viability', 0):.2f}).
+        Requirements: {request_data.get('required_organs')}
         """
 
         try:
-            # 8s hard limit
-            response = self.model.generate_content(
-                f"SYSTEM: {system_prompt}\nUSER: {user_prompt}",
-                generation_config={"timeout": 8.0, "temperature": 0.1}
+            # Generation Config for Medical Precision (dictionary format)
+            generation_config = {
+                "temperature": 0.2, # Low randomness for clinical consistency
+                "top_p": 0.9,
+                "top_k": 32,
+                "max_output_tokens": 400,
+            }
+
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    model.generate_content,
+                    user_prompt,
+                    generation_config=generation_config
+                ),
+                timeout=10.0
             )
+
+            # Robust Safety Checks
+            if not response.candidates:
+                raise ValueError("Gemini returned no candidates (Safety Block?)")
+            
+            if response.candidates[0].finish_reason != 1: # 1 = STOP (Success)
+                logger.warning(f"Gemini finish reason abnormal: {response.candidates[0].finish_reason}")
+                # Fallback to deterministic only if finish reason is bad
+                return deterministic_intro, "hybrid-safety-fallback"
+
             llm_synthesis = response.text.strip()
             
-            # Store in cache
+            # Cache the successful synthesis (with size-safety check)
+            if len(self._cache) >= self.MAX_CACHE_SIZE:
+                # Simple eviction: clear oldest entries if full
+                self._cache.clear() 
+
             self._cache[cache_key] = {
                 "explanation": llm_synthesis,
                 "timestamp": time.time()
             }
             return f"{deterministic_intro} {llm_synthesis}", "hybrid-gemini"
             
+        except asyncio.TimeoutError:
+            logger.error("Gemini Synthesis Timeout")
+            fallback = "Ranking criteria: Blood type compatibility, geographic optimization, and urgent clinical need."
+            return f"{deterministic_intro} {fallback}", "hybrid-timeout"
         except Exception as e:
-            fallback = "Ranking prioritized based on HLA compatibility, CIT window viability, and waitlist time."
+            logger.error(f"Gemini Synthesis Error: {e}")
+            fallback = "Ranking criteria: Blood type compatibility, geographic optimization, and urgent clinical need."
             return f"{deterministic_intro} {fallback}", "hybrid-fallback"
 
 _explanation_service = None

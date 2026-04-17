@@ -26,9 +26,8 @@ export default function AdminHospitalsPage() {
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const verifiedHospitals = allHospitals?.filter(h => h.is_verified) || [];
 
-  // Filter Logic
   const filteredHospitals = verifiedHospitals.filter(h => {
-    const matchesSearch = h.hospital_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch = h.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           h.license_number?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCity = selectedCity === "all" || h.city?.toLowerCase() === selectedCity.toLowerCase();
     return matchesSearch && matchesCity;
@@ -81,7 +80,6 @@ export default function AdminHospitalsPage() {
           <p className="text-muted-foreground mt-2 font-medium">Manage and monitor {filteredHospitals.length} active medical nodes.</p>
         </div>
 
-        {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
             <div className="relative group">
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -127,7 +125,7 @@ export default function AdminHospitalsPage() {
                   transition={{ delay: i * 0.05 }}
                   className="hover:bg-muted/30 transition-colors group"
                 >
-                  <td className="px-6 py-5 font-bold text-sm text-foreground">{h.hospital_name}</td>
+                  <td className="px-6 py-5 font-bold text-sm text-foreground">{h.name}</td>
                   <td className="px-6 py-5 text-xs font-bold text-muted-foreground">{h.city}</td>
                   <td className="px-6 py-5 text-xs font-mono font-bold text-primary">{h.license_number}</td>
                   <td className="px-6 py-5 text-right">
@@ -164,7 +162,6 @@ export default function AdminHospitalsPage() {
         </div>
       </div>
 
-      {/* Details Modal */}
       <AnimatePresence>
         {isModalOpen && selectedHospital && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -182,7 +179,7 @@ export default function AdminHospitalsPage() {
                       <Building2 className="h-8 w-8" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-black font-display text-foreground">{selectedHospital.hospital_name}</h2>
+                      <h2 className="text-2xl font-black font-display text-foreground">{selectedHospital.name}</h2>
                       <p className="text-xs font-bold text-primary uppercase tracking-widest mt-1">Verified Medical Node</p>
                     </div>
                   </div>

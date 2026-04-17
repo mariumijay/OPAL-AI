@@ -71,16 +71,14 @@ export async function proxy(request: NextRequest) {
     const isSuperAdmin = email === "ranahaseeb9427@gmail.com";
 
     // 1. Super Admin / Admin Override
-    // Allows full navigation across all dashboards if triggered by role-switcher
     if (role === 'admin' || isSuperAdmin || isAdminMode) {
       if (pathname === '/dashboard') {
         return NextResponse.redirect(new URL('/dashboard/admin', request.url));
       }
-      // Critical: Allow access to /dashboard/hospital or /dashboard/donor for admins
       return response;
     }
 
-    // 2. Role-based Root Dashboard Routing (Landing on /dashboard)
+    // 2. Role-based Root Dashboard Routing
     if (pathname === '/dashboard') {
       if (role === 'hospital') return NextResponse.redirect(new URL('/dashboard/hospital', request.url));
       if (role === 'doctor') return NextResponse.redirect(new URL('/dashboard/doctor', request.url));

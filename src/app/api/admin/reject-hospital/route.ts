@@ -20,8 +20,8 @@ export async function POST(request: Request) {
     // 1. Get details first
     const { data: hospital, error: fetchError } = await supabase
       .from("hospitals")
-      .select("email, hospital_name")
-      .eq("hospital_id", hospital_id)
+      .select("contact_email, name")
+      .eq("id", hospital_id)
       .single();
 
     if (fetchError || !hospital) throw new Error("Hospital not found");
@@ -30,15 +30,15 @@ export async function POST(request: Request) {
     const { error: deleteError } = await supabase
       .from("hospitals")
       .delete()
-      .eq("hospital_id", hospital_id);
+      .eq("id", hospital_id);
 
     if (deleteError) throw deleteError;
 
     // 3. Notify (Reliable email)
     try {
       await sendHospitalRejectionEmail(
-        hospital.email, 
-        hospital.hospital_name, 
+        hospital.contact_email, 
+        hospital.name, 
         "The institutional license or credentials provided could not be verified by our medical board."
       );
     } catch (e: any) {

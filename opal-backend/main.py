@@ -2,7 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from routes import blood_donors, organ_donors, hospitals, matching
+from routes import blood_donors, organ_donors, hospitals, matching, chat
 from routes.matching import get_model
 
 @asynccontextmanager
@@ -25,13 +25,14 @@ app = FastAPI(
 
 # CORS Configuration
 # Standard for Next.js development projects
+# Set to ["*"] with allow_credentials=False for bomb-proof testing
 origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_credentials=False,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -40,6 +41,7 @@ app.include_router(blood_donors.router)
 app.include_router(organ_donors.router)
 app.include_router(hospitals.router)
 app.include_router(matching.router)
+app.include_router(chat.router)
 
 @app.get("/")
 def read_root():

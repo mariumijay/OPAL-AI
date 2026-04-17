@@ -111,10 +111,10 @@ export default function NetworkMap({ donors, hospitals, matches }: NetworkMapPro
           const coords = CITY_COORDS[h.city as string];
           if (!coords) return null;
           return (
-            <Marker key={`hosp-${h.hospital_name || i}`} position={coords} icon={hospitalIcon}>
+            <Marker key={`hosp-${h.id || i}`} position={coords} icon={hospitalIcon}>
               <Popup>
                 <div className="p-2">
-                   <p className="text-xs font-black uppercase tracking-widest text-destructive mb-1">{h.hospital_name}</p>
+                   <p className="text-xs font-black uppercase tracking-widest text-destructive mb-1">{h.name}</p>
                    <p className="text-[10px] font-bold text-muted-foreground">Certified Medical Node</p>
                 </div>
               </Popup>

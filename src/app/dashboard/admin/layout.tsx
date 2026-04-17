@@ -1,64 +1,37 @@
-"use client";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { createServerSupabase } from "@/lib/supabase";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
-import { toast } from "sonner";
-import { ShieldAlert, Loader2 } from "lucide-react";
+/**
+ * Server-side Authorization Guard for the Admin Dashboard.
+ * Prevents unauthorized client rendering of sensitive medical controls.
+ */
+export default async function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const cookieStore = await cookies();
+  const supabase = await createServerSupabase(cookieStore);
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const supabase = createClient();
+  // 1. Authenticated Session Check
+  const { data: { user }, error } = await supabase.auth.getUser();
 
-  useEffect(() => {
-    async function verifyAdmin() {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        router.push("/auth/login");
-        return;
-      }
-
-      const role = session.user.user_metadata?.role;
-      // Also allow the specific master email as a fallback
-      const isAdminEmail = session.user.email?.toLowerCase() === "ranahaseeb9427@gmail.com";
-
-      if (role !== "admin" && !isAdminEmail) {
-        toast.error("Security Alert: Unauthorized access attempt to Command Center.");
-        router.push("/dashboard");
-        return;
-      }
-
-      setIsAuthorized(true);
-      setLoading(false);
-    }
-
-    verifyAdmin();
-  }, [router, supabase]);
-
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[70vh] space-y-4">
-        <Loader2 className="h-10 w-10 text-primary animate-spin" />
-        <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Authenticating Admin Session...</p>
-      </div>
-    );
+  if (error || !user) {
+    redirect("/auth/login?reason=session_required");
   }
 
-  if (!isAuthorized) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[70vh] space-y-4">
-        <div className="h-16 w-16 rounded-3xl bg-destructive/10 flex items-center justify-center text-destructive">
-          <ShieldAlert className="h-8 w-8" />
-        </div>
-        <h1 className="text-2xl font-black font-display">Access Denied</h1>
-        <p className="text-muted-foreground text-sm font-medium">This terminal is restricted to Super Admin personnel only.</p>
-      </div>
-    );
+  // 2. Role-Based Access Control (RBAC) Audit
+  // Source of truth: user_metadata (cached) or profiles table (deep check)
+  const role = user.user_metadata?.role;
+  const isSuperAdmin = user.email?.toLowerCase() === "ranahaseeb9427@gmail.com";
+
+  if (role !== "admin" && !isSuperAdmin) {
+    // If user exists but is not an admin, redirect to their respective dashboard
+    const targetDashboard = role ? `/dashboard/${role}` : "/dashboard/donor";
+    redirect(targetDashboard);
   }
 
+  // 3. Authorized Context Delivery
   return <>{children}</>;
 }

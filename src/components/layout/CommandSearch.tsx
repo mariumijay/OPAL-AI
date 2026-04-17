@@ -57,10 +57,10 @@ export function CommandSearch({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
     // Search Hospitals
     hospitals.forEach(h => {
-      if (h.hospital_name?.toLowerCase().includes(q) || h.city?.toLowerCase().includes(q)) {
+      if (h.name?.toLowerCase().includes(q) || h.city?.toLowerCase().includes(q)) {
         results.push({
-          id: h.id || h.hospital_id,
-          title: h.hospital_name,
+          id: h.id,
+          title: h.name,
           subtitle: `${h.hospital_type || 'Facility'} • ${h.city}`,
           type: "hospital",
           link: "/dashboard/admin/hospitals",

@@ -51,6 +51,7 @@ yarn-error.log*
 
 # env files
 .env*
+opal-backend/.env
 backend/.env
 
 # vercel

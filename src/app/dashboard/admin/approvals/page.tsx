@@ -187,7 +187,7 @@ export default function AdminApprovalsPage() {
                             {item.user_type === 'hospital' ? <Building2 className="h-5 w-5" /> : <UserCircle2 className="h-5 w-5" />}
                           </div>
                           <div>
-                            <p className="font-bold text-foreground text-sm">{item.full_name || item.hospital_name}</p>
+                            <p className="font-bold text-foreground text-sm">{item.full_name}</p>
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono uppercase tracking-tighter">APP-ID: {(item.id || 'unkn').slice(0,8)}</span>
                           </div>
                         </div>

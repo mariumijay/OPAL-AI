@@ -45,7 +45,8 @@ def compute_clinical_utility(row):
     proximity_score = max(0, 1 - (dist / 1000.0))
     
     utility = (0.4 * hla_score) + (0.3 * wait_score) + (0.2 * urgency_score) + (0.1 * proximity_score)
-    return np.clip(utility, 0, 1)
+    # XGBRanker requires integer relevance degrees (0, 1, 2...) for ndcg objective
+    return int(np.clip(utility * 10, 0, 10))
 
 def train_ranking_model():
     print("--- [ML] Initiating Clinical-Grade Ranking Overhaul ---")

@@ -25,33 +25,20 @@ export default function RequestsPage() {
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState<Partial<DonorRequestFormData>>({});
 
-  const { data: recipients } = useRecipients();
+  const { data: recipients, isLoading: isTableLoading } = useRecipients();
+  const createRequestMutation = useCreateRequest();
 
-  const hasLiveData = recipients && recipients.length > 0;
-  
-  const requests = hasLiveData
-    ? recipients.map((r) => ({
-        id: r.id,
-        type: r.required_organ && r.required_organ !== '—' ? 'organ' : 'blood',
-        blood_type: r.blood_type,
-        organ: r.required_organ,
-        urgency: r.urgency_level,
-        hospital: r.hospital_name,
-        status: r.status,
-        submitted_at: r.created_at,
-        city: r.city,
-      }))
-    : mockRequests.map((r) => ({
-        id: r.id,
-        type: r.request_type,
-        blood_type: r.blood_type || '',
-        organ: r.organ_type || '',
-        urgency: r.urgency,
-        hospital: r.hospital_name,
-        status: r.status,
-        submitted_at: r.created_at,
-        city: r.city,
-      }));
+  const requests = (recipients || []).map((r) => ({
+    id: r.id,
+    type: r.required_organ === 'Whole Blood' ? 'blood' : 'organ',
+    blood_type: r.blood_type,
+    organ: r.required_organ,
+    urgency: r.urgency_level,
+    hospital: r.hospital_name,
+    status: r.status,
+    submitted_at: r.created_at,
+    city: r.city,
+  }));
 
   const updateField = <K extends keyof DonorRequestFormData>(key: K, val: DonorRequestFormData[K]) =>
     setFormData((prev) => ({ ...prev, [key]: val }));
@@ -63,11 +50,15 @@ export default function RequestsPage() {
     return true;
   };
 
-  const handleSubmit = () => {
-    // Demo: just close form
-    setShowForm(false);
-    setStep(0);
-    setFormData({});
+  const handleSubmit = async () => {
+    try {
+      await createRequestMutation.mutateAsync(formData);
+      setShowForm(false);
+      setStep(0);
+      setFormData({});
+    } catch (e) {
+      // toast handled in hook
+    }
   };
 
   return (
