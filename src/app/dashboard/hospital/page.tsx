@@ -33,8 +33,7 @@ import {
   ShieldCheck,
   Loader2,
   Cpu,
-  Map,
-  ArrowRight
+  Map
 } from "lucide-react";
 
 export default function HospitalDashboard() {
