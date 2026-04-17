@@ -323,20 +323,35 @@ export default function HospitalDashboard() {
             </div>
           </div>
 
-          {/* Subscription Panel - Moved/Integrated */}
-          <div className="glass-card rounded-[2.5rem] p-8 border border-border bg-gradient-to-br from-primary/5 to-transparent flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                      <CreditCard className="h-6 w-6" />
+          {/* Critical Network Status - REPLACING WASTE PLAN CARD */}
+          <div className="glass-card rounded-[2.5rem] p-8 border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-transparent shadow-xl relative overflow-hidden group">
+              <div className="absolute -right-4 -top-4 h-24 w-24 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-all" />
+              <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                      <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                          <Activity className="h-7 w-7 animate-pulse" />
+                      </div>
+                      <div>
+                          <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Network Health</p>
+                          <h3 className="text-xl font-black font-display tracking-tight text-foreground mt-0.5">Live Clinical Registry</h3>
+                      </div>
                   </div>
-                  <div>
-                      <p className="text-[10px] font-black text-primary uppercase tracking-widest">Premium Network</p>
-                      <h3 className="text-lg font-bold font-display">Enterprise Elite Plan</h3>
+                  <div className="text-right">
+                      <div className="flex items-center gap-2 justify-end">
+                         <div className="h-1.5 w-1.5 rounded-full bg-success animate-ping" />
+                         <p className="text-2xl font-black text-foreground">1,542</p>
+                      </div>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Nodes Connected</p>
                   </div>
               </div>
-              <div className="text-right">
-                  <p className="text-2xl font-black text-foreground">24</p>
-                  <p className="text-[10px] font-black text-muted-foreground uppercase">days left</p>
+              
+              <div className="mt-6 grid grid-cols-3 gap-2">
+                  {['Lahore', 'Karachi', 'Isl'].map(city => (
+                    <div key={city} className="bg-muted/50 rounded-xl px-3 py-2 border border-border/50 flex flex-col">
+                        <span className="text-[8px] font-black text-muted-foreground uppercase">{city}</span>
+                        <span className="text-xs font-bold text-foreground">Active</span>
+                    </div>
+                  ))}
               </div>
           </div>
         </div>
