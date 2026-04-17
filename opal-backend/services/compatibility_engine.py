@@ -69,81 +69,94 @@ def haversine(lat1, lon1, lat2, lon2):
     c = 2 * asin(sqrt(a))
     return R * c
 
-def filter_compatible_donors(
+from services.match_engine import ClinicalLogisticsService as Logistics
+
+# Standard Recipient-Compatibility Matrix for Organs/Blood
+STANDARD_MATRIX = {
+    "A+": ["A+", "A-", "O+", "O-"],
+    "A-": ["A-", "O-"],
+    "B+": ["B+", "B-", "O+", "O-"],
+    "B-": ["B-", "O-"],
+    "AB+": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+    "AB-": ["A-", "B-", "AB-", "O-"],
+    "O+": ["O+", "O-"],
+    "O-": ["O-"],
+}
+
+async def filter_compatible_donors(
     donors: List[Dict[str, Any]],
     required_organs: List[str],
     patient_blood_type: str,
     hospital_lat: float,
-    hospital_lon: float
+    hospital_lon: float,
+    donor_category: str = "organ"
 ) -> Tuple[List[Dict[str, Any]], FilterStats]:
     """
-    Refactored with Cold Ischemia Time and Clinical Age gating.
+    Surgical Clinical Filter with Road-Logistics and Inverse Bio-Matrix.
     """
     stats = FilterStats(total=len(donors))
     compatible_donors = []
     
-    # Blood Matrix (Recipient Perspective: Who can GIVE to this recipient)
-    COMPATIBLE_BLOOD_FOR_RECIPIENT = {
-        "A+": ["A+", "A-", "O+", "O-"],
-        "A-": ["A-", "O-"],
-        "B+": ["B+", "B-", "O+", "O-"],
-        "B-": ["B-", "O-"],
-        "AB+": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
-        "AB-": ["A-", "B-", "AB-", "O-"],
-        "O+": ["O+", "O-"],
-        "O-": ["O-"],
-    }
+    # 🧬 1. Sourcing Matrix (Organ vs Plasma)
+    matrix = Logistics.get_clinical_matrix(donor_category)
+    # Handle Plasma category specifically for ABO mapping (O recipient for Plasma)
+    lookup_type = "O" if "O" in patient_blood_type and donor_category == "plasma" else patient_blood_type
 
-    for donor in donors:
-        # 1. Age Gating (Clinical Registry Compliance)
-        donor_age = donor.get('age', 0)
-        age_passed = True
-        for organ in required_organs:
-            if organ in ORGAN_AGE_LIMITS:
-                min_age, max_age = ORGAN_AGE_LIMITS[organ]
-                if not (min_age <= donor_age <= max_age):
-                    age_passed = False
-                    break
-        if not age_passed:
+    # 🧬 2. Collect Candidate Coordinates for Batch Road Scaling
+    destinations = []
+    valid_coord_donors = []
+    for d in donors:
+        if d.get('latitude') and d.get('longitude'):
+            destinations.append((d['latitude'], d['longitude']))
+            valid_coord_donors.append(d)
+        else:
+            stats.failed_cit += 1
+
+    # 🧬 3. Execute Road-Network Call (OSRM)
+    road_metrics = []
+    if destinations:
+        road_metrics = await Logistics.get_road_metrics((hospital_lat, hospital_lon), destinations)
+
+    # 🧬 4. Final Bio-Logistics Gating
+    for i, donor in enumerate(valid_coord_donors):
+        # A. Age Disqualification (Legal Adult 18+)
+        if donor.get('age', 0) < 18:
             stats.failed_age += 1
             continue
 
-        # 2. Blood Gating
-        if donor.get('blood_type') not in COMPATIBLE_BLOOD_FOR_RECIPIENT.get(patient_blood_type, []):
+        # B. Bio-Matrix Disqualification
+        donor_blood = donor.get('blood_type', '').split('+')[0].split('-')[0] if donor_category == "plasma" else donor.get('blood_type')
+        if donor_blood not in matrix.get(lookup_type, []):
             stats.failed_blood += 1
             continue
 
-        # 3. Transport & Cold Ischemia Time (CIT) Gating
-        # This is a hard medical filter - non-viable organs are excluded immediately
-        cit_passed = True
-        donor_lat = donor.get('latitude')
-        donor_lng = donor.get('longitude')
-        
-        if donor_lat is not None and donor_lng is not None:
-            dist = haversine(donor_lat, donor_lng, hospital_lat, hospital_lon)
-            donor['distance_km'] = dist
+        # C. CIT Road-Viability Disqualification
+        if i < len(road_metrics):
+            metrics = road_metrics[i]
+            travel_hours = metrics['duration_hours']
             
+            viable = True
             for organ in required_organs:
-                viable, travel_time = TransportViabilityService.is_cit_viable(organ, dist)
-                if not viable:
-                    cit_passed = False
+                if not Logistics.is_cit_viable(organ, travel_hours):
+                    viable = False
                     break
-                donor['estimated_travel_time'] = travel_time
+            
+            if not viable:
+                stats.failed_cit += 1
+                continue
+            
+            donor['road_distance_km'] = metrics['distance_km']
+            donor['travel_time_hours'] = travel_hours
+            donor['travel_time_human'] = f"{int(travel_hours)}h {int((travel_hours % 1) * 60)}m"
         else:
-            # If coordinates are missing, we cannot verify viability safely
-            cit_passed = False
-        
-        if not cit_passed:
             stats.failed_cit += 1
             continue
 
-        # 4. Standard Health Blockers (Binary medical counters)
-        # In production, these would be specific to each organ
-        if donor.get('hiv_status') == "Positive" or donor.get('hepatitis_status') == "Positive":
+        # D. Health Gate
+        if donor.get('hiv_status') == "Positive":
             stats.failed_condition += 1
             continue
 
-        # All clinical gates passed
         compatible_donors.append(donor)
         stats.passed += 1
 
