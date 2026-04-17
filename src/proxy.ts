@@ -30,22 +30,13 @@ export async function proxy(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  const { pathname, searchParams } = request.nextUrl;
+  const { pathname } = request.nextUrl;
 
-  const publicRoutes = [
-    '/auth/login',
-    '/auth/donor/signup',
-    '/auth/hospital/signup',
-    '/auth/forgot-password',
-    '/auth/reset-password',
-    '/auth/verify-email',
-    '/auth/role-select',
-    '/auth/pending-approval', 
-    '/',
-  ];
-
+  // Base Public Routes
+  const publicRoutes = ['/auth/login', '/auth/donor/signup', '/auth/hospital/signup', '/', '/api/backend'];
   const isPublic = publicRoutes.some(route => pathname === route || pathname.startsWith(route));
 
+  // GUEST Logic
   if (!user) {
     if (!isPublic && pathname.startsWith('/dashboard')) {
       return NextResponse.redirect(new URL('/auth/login', request.url));
@@ -53,47 +44,28 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  if (user && pathname.startsWith("/auth") && 
-      !pathname.includes('pending-approval') && 
-      !pathname.includes('donor/signup') && 
-      !pathname.includes('hospital/signup')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+  const role = user.user_metadata?.role || "donor";
+  const isAdmin = user.email?.toLowerCase() === "ranahaseeb9427@gmail.com";
+
+  // LOGGED IN Logic — Prevent Auth Pages
+  if (pathname.startsWith("/auth") && !pathname.includes('pending-approval')) {
+    const target = isAdmin ? '/dashboard/admin' : `/dashboard/${role}`;
+    return NextResponse.redirect(new URL(target, request.url));
   }
 
-  // Logged in — RBAC for Dashboards
-  if (pathname.startsWith('/dashboard')) {
-    const role = user.user_metadata?.role;
-    const email = user.email?.toLowerCase();
-    const isAdminMode = searchParams.get("mode") === "admin_view";
-    const isSuperAdmin = email === "ranahaseeb9427@gmail.com";
+  // Dashboard Context Switching
+  if (pathname === '/dashboard') {
+    const target = isAdmin ? '/dashboard/admin' : `/dashboard/${role}`;
+    return NextResponse.redirect(new URL(target, request.url));
+  }
 
-    // 1. Super Admin / Admin Override
-    if (role === 'admin' || isSuperAdmin || isAdminMode) {
-      if (pathname === '/dashboard') {
-        return NextResponse.redirect(new URL('/dashboard/admin', request.url));
-      }
-      return response;
-    }
-
-    // 2. Role-based Root Dashboard Routing
-    if (pathname === '/dashboard') {
-      if (role === 'hospital') return NextResponse.redirect(new URL('/dashboard/hospital', request.url));
-      if (role === 'doctor') return NextResponse.redirect(new URL('/dashboard/doctor', request.url));
+  // RBAC Guards (Prevent hopping between views)
+  if (!isAdmin) {
+    if (role === 'donor' && (pathname.startsWith('/dashboard/admin') || pathname.startsWith('/dashboard/hospital'))) {
       return NextResponse.redirect(new URL('/dashboard/donor', request.url));
     }
-
-    // 3. Donor Strict Guard
-    if (role === 'donor') {
-      if (pathname.startsWith('/dashboard/admin') || pathname.startsWith('/dashboard/hospital')) {
-         return NextResponse.redirect(new URL('/dashboard/donor', request.url));
-      }
-    }
-
-    // 4. Hospital Strict Guard
-    if (role === 'hospital') {
-      if (pathname.startsWith('/dashboard/admin') || pathname.startsWith('/dashboard/donor')) {
-         return NextResponse.redirect(new URL('/dashboard/hospital', request.url));
-      }
+    if (role === 'hospital' && (pathname.startsWith('/dashboard/admin') || pathname.startsWith('/dashboard/donor'))) {
+      return NextResponse.redirect(new URL('/dashboard/hospital', request.url));
     }
   }
 
